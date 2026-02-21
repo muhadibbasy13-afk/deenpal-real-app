@@ -272,32 +272,11 @@ export default function App() {
   
   const filteredMessages = activeThreadId 
     ? (() => {
-        const threadIndex = chatThreads.findIndex(t => t.id === activeThreadId);
-        if (threadIndex === -1) return messages;
+        if (activeThreadId === 'new') return [];
         
-        // Find the messages belonging to this thread
-        const allThreads = [...chatThreads].reverse(); // Oldest first
-        const targetThread = allThreads.find(t => t.id === activeThreadId);
-        if (!targetThread) return messages;
-
-        // Re-calculate the clusters to find the exact messages
-        let currentThreadMsgs: Message[] = [messages[0]];
-        const clusters: Message[][] = [];
-        for (let i = 1; i < messages.length; i++) {
-          const prev = messages[i-1];
-          const curr = messages[i];
-          const diff = curr.timestamp.getTime() - prev.timestamp.getTime();
-          if (diff > 1000 * 60 * 60 * 2) {
-            clusters.push(currentThreadMsgs);
-            currentThreadMsgs = [curr];
-          } else {
-            currentThreadMsgs.push(currentThreadMsgs); // This is wrong, fixing below
-          }
-        }
-        // Actually, let's just use a simpler filtering logic:
-        // Find the start message and end message of the thread.
         const threadStartMsg = messages.find(m => m.id === activeThreadId);
-        if (!threadStartMsg) return messages;
+        if (!threadStartMsg) return [];
+        
         const startIndex = messages.indexOf(threadStartMsg);
         let endIndex = messages.length;
         for (let i = startIndex + 1; i < messages.length; i++) {
@@ -308,7 +287,24 @@ export default function App() {
         }
         return messages.slice(startIndex, endIndex);
       })()
-    : messages;
+    : (() => {
+        if (messages.length === 0) return [];
+        
+        // Check if latest thread is "active" (last message < 2h ago)
+        const lastMsg = messages[messages.length - 1];
+        const now = new Date();
+        if (now.getTime() - lastMsg.timestamp.getTime() > 1000 * 60 * 60 * 2) {
+          return [];
+        }
+
+        let lastThreadStart = 0;
+        for (let i = 1; i < messages.length; i++) {
+          if (messages[i].timestamp.getTime() - messages[i-1].timestamp.getTime() > 1000 * 60 * 60 * 2) {
+            lastThreadStart = i;
+          }
+        }
+        return messages.slice(lastThreadStart);
+      })();
 
   useEffect(() => {
     scrollToBottom();
@@ -399,6 +395,7 @@ export default function App() {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
+    setActiveThreadId(null);
 
     if (user) {
       await saveMessage(userMessage);
@@ -1197,9 +1194,9 @@ export default function App() {
                     className="flex justify-start"
                   >
                     <div className="bg-white p-4 rounded-3xl border border-deenly-gold/10 flex items-center gap-2">
-                      <div className="w-2 h-2 bg-deenly-gold rounded-full animate-bounce" style={{ animationDelay: '0ms' }} style={{ animationDelay: '0ms' }} />
-                      <div className="w-2 h-2 bg-deenly-gold rounded-full animate-bounce" style={{ animationDelay: '150ms' }} style={{ animationDelay: '150ms' }} />
-                      <div className="w-2 h-2 bg-deenly-gold rounded-full animate-bounce" style={{ animationDelay: '300ms' }} style={{ animationDelay: '300ms' }} />
+                      <div className="w-2 h-2 bg-deenly-gold rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="w-2 h-2 bg-deenly-gold rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-2 h-2 bg-deenly-gold rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
                   </motion.div>
                 )}
@@ -1260,7 +1257,7 @@ export default function App() {
         >
           <div className="p-6 flex-1 flex flex-col overflow-hidden">
             <button 
-              onClick={clearMessages}
+              onClick={() => setActiveThreadId('new')}
               className="w-full py-3 px-4 rounded-xl border border-deenly-gold/20 flex items-center gap-3 hover:bg-deenly-gold/5 transition-all mb-6 group"
             >
               <Plus size={18} className="text-deenly-gold" />
@@ -1302,11 +1299,32 @@ export default function App() {
             <div className="flex-1 overflow-y-auto scrollbar-hide">
               <h4 className="text-[10px] uppercase tracking-widest font-bold text-deenly-gold/40 mb-4 px-2">Tus chats</h4>
               <div className="space-y-2">
-                {messages.length > 0 ? (
-                  <button className="w-full p-3 rounded-xl bg-deenly-gold/10 border border-deenly-gold/20 text-left transition-all">
-                    <p className="text-sm font-bold truncate">Chat actual</p>
-                    <p className="text-[10px] opacity-50 mt-1">{messages.length} mensajes</p>
-                  </button>
+                {chatThreads.length > 0 ? (
+                  chatThreads.map((thread) => (
+                    <button 
+                      key={thread.id}
+                      onClick={() => setActiveThreadId(thread.id)}
+                      className={cn(
+                        "w-full p-3 rounded-xl text-left transition-all border",
+                        activeThreadId === thread.id 
+                          ? "bg-deenly-gold/10 border-deenly-gold/30" 
+                          : "border-transparent hover:bg-deenly-gold/5"
+                      )}
+                    >
+                      <p className={cn(
+                        "text-sm truncate font-medium",
+                        activeThreadId === thread.id ? "text-deenly-green" : "opacity-70"
+                      )}>
+                        {thread.title}
+                      </p>
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-[10px] opacity-40">
+                          {thread.date.toLocaleDateString([], { day: 'numeric', month: 'short' })}
+                        </p>
+                        <p className="text-[10px] opacity-40">{thread.messageCount} msgs</p>
+                      </div>
+                    </button>
+                  ))
                 ) : (
                   <p className="text-xs text-center opacity-30 py-8">No hay chats recientes</p>
                 )}
