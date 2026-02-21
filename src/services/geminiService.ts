@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || "" });
 
 export interface ChatMessage {
   role: 'user' | 'model';
@@ -8,8 +8,8 @@ export interface ChatMessage {
 }
 
 export const getMuftiResponse = async (prompt: string, history: ChatMessage[] = [], memories: string[] = [], isPremium: boolean = false) => {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error("La clave API de Gemini no está configurada. Por favor, asegúrate de que GEMINI_API_KEY esté presente en el entorno.");
+  if (!import.meta.env.VITE_GEMINI_API_KEY) {
+    throw new Error("La clave API de Gemini no está configurada. Por favor, asegúrate de que VITE_GEMINI_API_KEY esté presente en el entorno.");
   }
 
   const premiumContext = isPremium 
