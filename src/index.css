@@ -6,23 +6,28 @@
   --font-serif: "Cormorant Garamond", serif;
   
   --color-deenly-gold: #C5A059;
-  --color-deenly-green: #2E7D32;
-  --color-deenly-cream: #FDFBF7;
+  --color-deenly-green: #1F4D2E;
+  --color-deenly-cream: #F5F2ED;
+  --color-deenly-white: #FFFFFF;
 
   /* Dark Mode Colors */
-  --color-deenly-dark-bg: #1A1A1A;
-  --color-deenly-dark-surface: #262626;
+  --color-deenly-dark-bg: #121212;
+  --color-deenly-dark-surface: #1E1E1E;
   --color-deenly-dark-text: #E5E5E5;
 }
 
 @layer base {
   body {
-    @apply bg-deenly-cream text-deenly-green font-sans;
+    @apply bg-deenly-cream text-deenly-green font-sans antialiased;
   }
   
   h1, h2, h3, h4, h5, h6 {
     @apply font-serif;
   }
+}
+
+.islamic-pattern {
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0l5.878 18.09h19.022L39.46 29.18l5.878 18.09L30 36.09l-15.338 11.18 5.878-18.09L5.1 18.09h19.022L30 0z' fill='%231F4D2E' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E");
 }
 
 .markdown-body p {
