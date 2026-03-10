@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { Mail, Lock, User, ArrowRight, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface AuthProps {
   darkMode: boolean;
@@ -14,6 +15,7 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [onboardingData, setOnboardingData] = useState({
@@ -117,16 +119,23 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
   if (showOnboarding) {
     const currentQ = onboardingQuestions[onboardingStep];
     return (
-      <div className={`min-h-screen flex items-center justify-center p-4 ${darkMode ? 'bg-[#0a0a0a] text-white' : 'bg-[#f5f5f0] text-gray-900'}`}>
-        <div 
-          className={`w-full max-w-md p-8 rounded-[40px] shadow-2xl ${darkMode ? 'bg-[#141414] border border-white/10' : 'bg-white border border-black/5'}`}
+      <div className="min-h-screen flex items-center justify-center p-4 bg-[#0a2e24] relative overflow-hidden">
+        {/* Background Decorative Elements */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0a2e24] via-[#1a4d3e] to-[#0a2e24]" />
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/10 blur-[120px] rounded-full" />
+        
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md p-8 rounded-[40px] shadow-2xl bg-white/10 backdrop-blur-xl border border-white/20 text-white relative z-10"
         >
           <div className="text-center mb-8">
             <div className="flex justify-center gap-2 mb-6">
               {onboardingQuestions.map((_, i) => (
                 <div 
                   key={i} 
-                  className={`h-1.5 rounded-full transition-all duration-500 ${i <= onboardingStep ? 'w-8 bg-emerald-500' : 'w-2 bg-gray-300'}`} 
+                  className={`h-1.5 rounded-full transition-all duration-500 ${i <= onboardingStep ? 'w-8 bg-emerald-400' : 'w-2 bg-white/20'}`} 
                 />
               ))}
             </div>
@@ -153,14 +162,14 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
                       setOnboardingData({ ...onboardingData, [currentQ.id]: option });
                     }
                   }}
-                  className={`w-full p-4 rounded-2xl border-2 transition-colors text-left font-medium flex items-center justify-between ${
+                  className={`w-full p-4 rounded-2xl border-2 transition-all text-left font-medium flex items-center justify-between ${
                     isSelected 
-                      ? 'border-emerald-500 bg-emerald-500/5 text-emerald-500' 
-                      : 'border-gray-100 hover:border-emerald-500/30'
+                      ? 'border-emerald-400 bg-emerald-400/20 text-white shadow-[0_0_15px_rgba(52,211,153,0.3)]' 
+                      : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}
                 >
                   {option}
-                  {isSelected && <CheckCircle2 size={18} />}
+                  {isSelected && <CheckCircle2 size={18} className="text-emerald-400" />}
                 </button>
               );
             })}
@@ -169,119 +178,175 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
           <button
             onClick={handleOnboardingNext}
             disabled={loading || (!currentQ.multiple && !(onboardingData as any)[currentQ.id]) || (currentQ.multiple && onboardingData.interests.length === 0)}
-            className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold transition-colors flex items-center justify-center gap-2 mt-8 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+            className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2 mt-8 shadow-lg shadow-emerald-500/20 disabled:opacity-50 active:scale-[0.98]"
           >
             {loading ? <Loader2 className="animate-spin" size={20} /> : (onboardingStep === onboardingQuestions.length - 1 ? 'Finalizar' : 'Siguiente')}
             <ArrowRight size={18} />
           </button>
-        </div>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen flex items-center justify-center p-4 ${darkMode ? 'bg-[#0a0a0a] text-white' : 'bg-[#f5f5f0] text-gray-900'}`}>
-      <div 
-        className={`w-full max-w-md p-8 rounded-3xl shadow-2xl ${darkMode ? 'bg-[#141414] border border-white/10' : 'bg-white border border-black/5'}`}
-      >
-        <div className="text-center mb-8">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#0a2e24] relative overflow-hidden font-sans">
+      {/* Dynamic Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0a2e24] via-[#1a4d3e] to-[#0a2e24]" />
+      
+      {/* Stars/Particles Effect */}
+      <div className="absolute inset-0 pointer-events-none opacity-30">
+        {[...Array(20)].map((_, i) => (
           <div 
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-500 mb-4"
-          >
-            <User size={32} />
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight mb-2">
+            key={i}
+            className="absolute bg-white rounded-full animate-pulse"
+            style={{
+              top: `${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
+              width: `${Math.random() * 3}px`,
+              height: `${Math.random() * 3}px`,
+              animationDelay: `${Math.random() * 5}s`,
+              animationDuration: `${2 + Math.random() * 3}s`
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Hero Section */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center mb-10 relative z-10"
+      >
+        <div className="relative inline-block mb-4">
+          <div className="absolute inset-0 bg-emerald-500/20 blur-3xl rounded-full" />
+          <svg width="80" height="80" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
+            <path d="M58 42C58 42 54 38 48 38C41.3726 38 36 43.3726 36 50C36 56.6274 41.3726 62 48 62C54 62 58 58 58 58C54 58 51 55 51 50C51 45 54 42 58 42Z" fill="#F0E68C" />
+            <path d="M50 20L53 28L62 28L55 33L58 41L50 36L42 41L45 33L38 28L47 28L50 20Z" fill="#F0E68C" />
+          </svg>
+        </div>
+        <h1 className="text-5xl font-bold tracking-[0.2em] text-white mb-2 drop-shadow-lg">DEENLY</h1>
+        <p className="text-emerald-100/70 text-sm tracking-widest uppercase font-medium">Tu compañero espiritual en el camino del conocimiento</p>
+      </motion.div>
+
+      {/* Glassmorphism Card */}
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-md p-10 rounded-[40px] shadow-2xl bg-white/10 backdrop-blur-2xl border border-white/20 relative z-10 overflow-hidden"
+      >
+        {/* Subtle inner glow */}
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+        
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-bold text-white mb-2">
             {isLogin ? 'Bienvenido a Deenly' : 'Crea tu cuenta'}
-          </h1>
-          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-            {isLogin ? 'Tu asistente islámico personal te espera' : 'Únete a nuestra comunidad de aprendizaje'}
+          </h2>
+          <p className="text-white/60 text-sm">
+            {isLogin ? 'Accede a tu espacio espiritual personalizado' : 'Únete a nuestra comunidad de aprendizaje'}
           </p>
+          <div className="flex justify-center mt-4">
+            <div className="h-px w-12 bg-white/20" />
+            <div className="mx-2 text-white/20 text-[10px]">✦</div>
+            <div className="h-px w-12 bg-white/20" />
+          </div>
         </div>
 
-        <form onSubmit={handleAuth} className="space-y-4">
-          {!isLogin && (
-            <div
-              className="space-y-2"
-            >
-              <label className="text-sm font-medium ml-1">Nombre completo</label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  required={!isLogin}
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className={`w-full pl-10 pr-4 py-3 rounded-xl border transition-colors outline-none ${
-                    darkMode 
-                      ? 'bg-[#1a1a1a] border-white/10 focus:border-emerald-500/50' 
-                      : 'bg-gray-50 border-gray-200 focus:border-emerald-500/50'
-                  }`}
-                  placeholder="Tu nombre"
-                />
-              </div>
-            </div>
-          )}
+        <form onSubmit={handleAuth} className="space-y-6">
+          <AnimatePresence mode="wait">
+            {!isLogin && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="space-y-2"
+              >
+                <label className="text-xs font-bold uppercase tracking-widest text-white/70 ml-1">Nombre completo</label>
+                <div className="relative group">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-emerald-400 transition-colors" size={18} />
+                  <input
+                    type="text"
+                    required={!isLogin}
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 focus:bg-white/10 focus:border-emerald-400/50 focus:ring-4 focus:ring-emerald-400/10 outline-none transition-all"
+                    placeholder="Tu nombre"
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium ml-1">Correo electrónico</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <label className="text-xs font-bold uppercase tracking-widest text-white/70 ml-1">Correo electrónico</label>
+            <div className="relative group">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-emerald-400 transition-colors" size={18} />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className={`w-full pl-10 pr-4 py-3 rounded-xl border transition-colors outline-none ${
-                  darkMode 
-                    ? 'bg-[#1a1a1a] border-white/10 focus:border-emerald-500/50' 
-                    : 'bg-gray-50 border-gray-200 focus:border-emerald-500/50'
-                }`}
-                placeholder="tu@correo.com"
+                className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 focus:bg-white/10 focus:border-emerald-400/50 focus:ring-4 focus:ring-emerald-400/10 outline-none transition-all"
+                placeholder="Tu correo electrónico"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium ml-1">Contraseña</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <label className="text-xs font-bold uppercase tracking-widest text-white/70 ml-1">Contraseña</label>
+            <div className="relative group">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-emerald-400 transition-colors" size={18} />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className={`w-full pl-10 pr-4 py-3 rounded-xl border transition-colors outline-none ${
-                  darkMode 
-                    ? 'bg-[#1a1a1a] border-white/10 focus:border-emerald-500/50' 
-                    : 'bg-gray-50 border-gray-200 focus:border-emerald-500/50'
-                }`}
-                placeholder="••••••••"
+                className="w-full pl-12 pr-12 py-4 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 focus:bg-white/10 focus:border-emerald-400/50 focus:ring-4 focus:ring-emerald-400/10 outline-none transition-all"
+                placeholder="Tu contraseña"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
 
-          {error && (
-            <div 
-              className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 text-red-500 text-sm"
-            >
-              <AlertCircle size={16} />
-              <span>{error}</span>
+          {isLogin && (
+            <div className="text-right">
+              <button type="button" className="text-xs text-white/40 hover:text-white transition-colors">
+                ¿Olvidaste tu contraseña?
+              </button>
             </div>
           )}
 
+          {error && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-2 p-4 rounded-2xl bg-red-500/20 border border-red-500/30 text-red-200 text-sm"
+            >
+              <AlertCircle size={16} />
+              <span>{error}</span>
+            </motion.div>
+          )}
+
           {success && (
-            <div 
-              className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 text-emerald-500 text-sm"
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-2 p-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-200 text-sm"
             >
               <CheckCircle2 size={16} />
               <span>{success}</span>
-            </div>
+            </motion.div>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-lg shadow-emerald-500/20"
+            className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-xl shadow-emerald-900/40 active:scale-[0.98]"
           >
             {loading ? (
               <Loader2 className="animate-spin" size={20} />
@@ -294,15 +359,45 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
           </button>
         </form>
 
-        <div className="mt-8 text-center">
+        <div className="relative my-8">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-white/10"></div>
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-[#1a4d3e] px-2 text-white/30">o</span>
+          </div>
+        </div>
+
+        <div className="text-center">
           <button
             onClick={() => setIsLogin(!isLogin)}
-            className={`text-sm font-medium hover:underline ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}
+            className="w-full py-4 rounded-2xl border border-white/10 text-white/80 font-medium hover:bg-white/5 transition-all active:scale-[0.98]"
           >
-            {isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'}
+            {isLogin ? 'Crear cuenta nueva' : '¿Ya tienes cuenta? Inicia sesión'}
           </button>
         </div>
-      </div>
+
+        <div className="mt-8 text-center">
+          <p className="text-[10px] text-white/30 leading-relaxed">
+            Al continuar, aceptas nuestros <button className="underline hover:text-white">Términos</button> y <button className="underline hover:text-white">Política de Privacidad</button>
+          </p>
+        </div>
+      </motion.div>
+
+      {/* Footer Quote */}
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5 }}
+        className="mt-12 text-center relative z-10 max-w-lg"
+      >
+        <p className="text-white/80 text-xl font-serif mb-2" dir="rtl">
+          وَإِذَا سَأَلَكَ عِبَادِي عَنِّي فَإِنِّي قَرِيبٌ
+        </p>
+        <p className="text-white/40 text-xs italic">
+          "Y cuando mis siervos te pregunten por Mí, diles que estoy cerca..." (Corán 2:186)
+        </p>
+      </motion.div>
     </div>
   );
 };
