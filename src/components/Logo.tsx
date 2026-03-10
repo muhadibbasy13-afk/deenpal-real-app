@@ -72,7 +72,7 @@ export const Logo: React.FC<LogoProps> = ({
         <circle cx="25" cy="50" r="2" fill={activeColors.gold} />
       </svg>
       {showText && (
-        <span className={`text-2xl font-serif font-bold tracking-tight`} style={{ color: activeColors.text }}>
+        <span className={`text-2xl font-display font-bold tracking-tight`} style={{ color: activeColors.text }}>
           Deenly
         </span>
       )}

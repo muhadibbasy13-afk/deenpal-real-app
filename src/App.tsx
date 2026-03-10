@@ -1,682 +1,704 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Moon, Sun, BookOpen, MessageSquare, Info, Sparkles, ChevronRight, History, LogIn, LogOut, User, Brain, Trash2, Plus, Check, X, AlertTriangle, Clock, CreditCard, PauseCircle, ShieldCheck, Bell, Share2, Star } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import Markdown from 'react-markdown';
-import { getMuftiResponse, type ChatMessage } from './services/geminiService';
-import { supabase } from './services/supabaseClient';
-import { loadStripe } from '@stripe/stripe-js';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Send, 
+  Search, 
+  Menu, 
+  X, 
+  Moon, 
+  Sun, 
+  User, 
+  Bell,
+  Settings, 
+  Sparkles, 
+  ChevronRight,
+  MessageSquare,
+  BookOpen,
+  Loader2,
+  Plus,
+  History,
+  ShieldCheck,
+  Zap,
+  Info,
+  Calendar,
+  Clock,
+  Book,
+  Trash2,
+  Edit2,
+  Check
+} from 'lucide-react';
 import { Logo } from './components/Logo';
-import { HADITH_COLLECTIONS, type Hadith } from './data/hadiths';
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { QuranSearchModal } from './components/QuranSearchModal';
+import { SurahLibrary } from './components/SurahLibrary';
+import { Auth } from './components/Auth';
+import { ProfileModal } from './components/ProfileModal';
+import { SettingsModal } from './components/SettingsModal';
+import { AboutModal } from './components/AboutModal';
+import { PlansModal } from './components/PlansModal';
+import { IslamicCalendarModal } from './components/IslamicCalendarModal';
+import { HadithModal } from './components/HadithModal';
+import { PrayerTimesModal } from './components/PrayerTimesModal';
+import AyahOfTheDay from './components/AyahOfTheDay';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
+import { getMuftiResponse, type ChatMessage as GeminiChatMessage } from './services/geminiService';
+import { chatService, type Chat, type Message as DbMessage } from './services/chatService';
+import ReactMarkdown from 'react-markdown';
+import type { Session } from '@supabase/supabase-js';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-  user_id?: string;
-  is_starred?: boolean;
-}
-
-interface Memory {
-  id: string;
-  content: string;
-  created_at: string;
-}
-
-interface Reminder {
-  id: string;
   text: string;
-  dueDate: Date;
-  completed: boolean;
-  notified: boolean;
+  timestamp: Date;
 }
 
-const COMMON_QUESTIONS = [
-  {
-    category: "Corán",
-    icon: BookOpen,
-    questions: [
-      "¿Cuál es el mensaje principal del Corán?",
-      "¿Cómo se dividen las Suras en el Corán?",
-      "¿Qué dice el Corán sobre la creación del universo?",
-      "Explícame el concepto de 'Tawhid' en el Corán."
-    ]
-  },
-  {
-    category: "Sunnah",
-    icon: History,
-    questions: [
-      "¿Qué es la Sunnah y por qué es importante?",
-      "Dime un Hadiz sobre la importancia de la educación.",
-      "¿Cómo era el carácter del Profeta Muhammad (SAW)?",
-      "¿Cuáles son los beneficios de seguir la Sunnah?"
-    ]
-  },
-  {
-    category: "Fiqh",
-    icon: Brain,
-    questions: [
-      "¿Cuáles son los pilares del Islam?",
-      "¿Cómo se realiza correctamente el Wudu?",
-      "¿Qué invalida el ayuno en Ramadán?",
-      "Explícame las reglas básicas del Zakat."
-    ]
-  }
-];
+interface ChatSession {
+  id: string;
+  title: string;
+  messages: Message[];
+  lastUpdated: Date;
+}
 
-const SUGGESTED_QUESTIONS = [
-  "¿Cómo puedo mejorar mi concentración en el Salah?",
-  "Explícame la importancia de la paciencia (Sabr) en el Islam.",
-  "¿Qué dice el Corán sobre el trato a los padres?",
-  "Dime un Hadiz sobre la amabilidad.",
-];
-
-const Skeleton = ({ className }: { className?: string }) => (
-  <div className={cn("animate-pulse bg-deenly-gold/10 rounded-lg", className)} />
-);
-
-const PremiumSpinner = () => (
-  <div className="flex flex-col items-center justify-center space-y-6">
-    <div className="relative">
-      <motion.div 
-        animate={{ rotate: 360 }}
-        transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-        className="w-20 h-20 rounded-full border-2 border-deenly-gold/10 border-t-deenly-gold"
-      />
-      <div className="absolute inset-0 flex items-center justify-center">
-        <Logo size={48} />
+const Splash = () => (
+  <div className="fixed inset-0 z-[100] bg-deenly-cream flex flex-col items-center justify-center p-8 text-center">
+    <div className="mb-8 relative">
+      <div className="absolute inset-0 bg-deenly-gold/20 blur-3xl rounded-full animate-pulse" />
+      <div className="relative">
+        <Logo size={80} />
       </div>
     </div>
-    <div className="text-center">
+    <div className="text-center space-y-3">
       <Logo showText size={0} className="justify-center" />
-      <p className="text-[10px] text-deenly-green/40 mt-2">Preparando tu espacio espiritual...</p>
+      <p className="text-[10px] uppercase tracking-[0.4em] font-bold text-deenly-gold/60">Eleva tu conocimiento espiritual</p>
+      <div className="mt-8 flex gap-1 justify-center">
+        {[0, 1, 2].map(i => (
+          <div
+            key={i}
+            className="w-1.5 h-1.5 rounded-full bg-deenly-gold opacity-50 animate-pulse"
+          />
+        ))}
+      </div>
     </div>
   </div>
 );
 
-const STRIPE_PRICE_MONTHLY = 'price_1T40qMDlissxr9xdar8montv';
-const STRIPE_PRICE_YEARLY = 'price_1T40s4Dlissxr9xdjnhaHivD';
-
 export default function App() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: 'Assalamu alaikum. Soy Deenly, tu asistente educativo islámico. Puedo ayudarte a entender el Islam con claridad y respeto. Para asuntos personales o legales, consulta siempre a un erudito cualificado.',
-      timestamp: new Date()
-    }
-  ]);
+  const [session, setSession] = useState<Session | null>(null);
+  const [showSplash, setShowSplash] = useState(true);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [showInfo, setShowInfo] = useState(false);
-  const [showMemoryModal, setShowMemoryModal] = useState(false);
-  const [memories, setMemories] = useState<Memory[]>([]);
-  const [newMemory, setNewMemory] = useState('');
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authName, setAuthName] = useState('');
-  const [authSurname, setAuthSurname] = useState('');
-  const [authAge, setAuthAge] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authMessage, setAuthMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-  const [isPremium, setIsPremium] = useState(false);
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
-  const [questionsToday, setQuestionsToday] = useState(0);
-  const [showPremiumModal, setShowPremiumModal] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showLimitModal, setShowLimitModal] = useState(false);
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelStep, setCancelStep] = useState<'reason' | 'offer' | 'confirm'>('reason');
-  const [selectedReason, setSelectedReason] = useState<string | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
-  const [threadToDelete, setThreadToDelete] = useState<string | null>(null);
-  const [showHadithLibrary, setShowHadithLibrary] = useState(false);
-  const [selectedHadith, setSelectedHadith] = useState<Hadith | null>(null);
-  const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
-  const [showSplash, setShowSplash] = useState(true);
-  const [showSidebar, setShowSidebar] = useState(true);
-  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [isSurahLibraryOpen, setIsSurahLibraryOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
+  const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
+  const [isIslamicCalendarOpen, setIsIslamicCalendarOpen] = useState(false);
+  const [isHadithModalOpen, setIsHadithModalOpen] = useState(false);
+  const [isPrayerTimesModalOpen, setIsPrayerTimesModalOpen] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
   const [darkMode, setDarkMode] = useState(false);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [showRemindersModal, setShowRemindersModal] = useState(false);
-  const [newReminderText, setNewReminderText] = useState('');
-  const [newReminderDate, setNewReminderDate] = useState('');
-  const [newReminderTime, setNewReminderTime] = useState('');
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [fontSize, setFontSize] = useState<'small' | 'medium' | 'large'>('medium');
+  const [cardStyle, setCardStyle] = useState<'compact' | 'wide'>('wide');
+  const [language, setLanguage] = useState('Español');
+  const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
+  const [isPremium, setIsPremium] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
 
   useEffect(() => {
-    const query = new URLSearchParams(window.location.search);
-    if (query.get('success') === 'true') {
-      const sessionId = query.get('session_id');
-      if (sessionId) {
-        // Refresh session to get updated metadata
-        supabase.auth.refreshSession().then(({ data }) => {
-          if (data.user?.user_metadata?.is_premium) {
-            setIsPremium(true);
-          } else {
-            // Fallback to optimistic update if refresh hasn't caught up yet
-            setIsPremium(true);
-          }
-        });
-        alert('¡Bienvenido a Deenly Premium! Tu suscripción ha sido activada.');
-        // Clean up URL
-        window.history.replaceState({}, document.title, "/");
-      }
-    } else if (query.get('success') === 'false') {
-      alert('El pago fue cancelado. Puedes intentarlo de nuevo cuando quieras.');
-      window.history.replaceState({}, document.title, "/");
+    if (!isSupabaseConfigured) {
+      loadSessions();
+      return;
     }
-  }, []);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setShowSplash(false), 1000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }, []);
-
-  useEffect(() => {
-    const checkReminders = () => {
-      const now = new Date();
-      setReminders(prev => prev.map(reminder => {
-        if (!reminder.completed && !reminder.notified && new Date(reminder.dueDate) <= now) {
-          if (Notification.permission === "granted") {
-            new Notification("Recordatorio de Deenly", {
-              body: reminder.text,
-              icon: "/favicon.ico"
-            });
-          }
-          return { ...reminder, notified: true };
-        }
-        return reminder;
-      }));
-    };
-
-    const interval = setInterval(checkReminders, 30000); // Check every 30 seconds
-    return () => clearInterval(interval);
-  }, [reminders]);
-
-  useEffect(() => {
-    // Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        setIsPremium(session.user.user_metadata?.is_premium || false);
-        loadMessages(session.user.id);
-        loadMemories(session.user.id);
-        loadDailyCount(session.user.id);
+      setSession(session);
+      if (session?.user?.user_metadata?.is_premium) {
+        setIsPremium(true);
+      }
+      if (session?.user?.user_metadata?.settings?.darkMode !== undefined) {
+        setDarkMode(session.user.user_metadata.settings.darkMode);
+      }
+      if (session?.user?.user_metadata?.settings?.fontSize) {
+        setFontSize(session.user.user_metadata.settings.fontSize);
+      }
+      if (session?.user?.user_metadata?.settings?.cardStyle) {
+        setCardStyle(session.user.user_metadata.settings.cardStyle);
+      }
+      if (session?.user?.user_metadata?.settings?.language) {
+        setLanguage(session.user.user_metadata.settings.language);
+      }
+      if (session?.user?.user_metadata?.settings?.dateFormat) {
+        setDateFormat(session.user.user_metadata.settings.dateFormat);
       }
     });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        setIsPremium(session.user.user_metadata?.is_premium || false);
-        loadMessages(session.user.id);
-        loadMemories(session.user.id);
-        loadDailyCount(session.user.id);
-      } else {
-        setIsPremium(false);
-        setMessages([]);
-        setMemories([]);
-        setQuestionsToday(0);
-      }
-    });
+    const {
+      data: { subscription },
+    } = isSupabaseConfigured 
+      ? supabase.auth.onAuthStateChange((_event, session) => {
+          setSession(session);
+          if (!session) {
+            setMessages([]);
+            setSessions([]);
+            setCurrentSessionId(null);
+            setIsPremium(false);
+          } else {
+            if (session?.user?.user_metadata?.is_premium) {
+              setIsPremium(true);
+            } else {
+              setIsPremium(false);
+            }
+          }
+          
+          if (session?.user?.user_metadata?.settings?.darkMode !== undefined) {
+            setDarkMode(session.user.user_metadata.settings.darkMode);
+          }
+          if (session?.user?.user_metadata?.settings?.fontSize) {
+            setFontSize(session.user.user_metadata.settings.fontSize);
+          }
+          if (session?.user?.user_metadata?.settings?.cardStyle) {
+            setCardStyle(session.user.user_metadata.settings.cardStyle);
+          }
+          if (session?.user?.user_metadata?.settings?.language) {
+            setLanguage(session.user.user_metadata.settings.language);
+          }
+          if (session?.user?.user_metadata?.settings?.dateFormat) {
+            setDateFormat(session.user.user_metadata.settings.dateFormat);
+          }
+        })
+      : { data: { subscription: { unsubscribe: () => {} } } };
 
-    return () => subscription.unsubscribe();
+    return () => {
+      if (subscription) subscription.unsubscribe();
+    };
   }, []);
 
-  const addReminder = () => {
-    if (!newReminderText || !newReminderDate || !newReminderTime) return;
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 2500);
     
-    const dueDate = new Date(`${newReminderDate}T${newReminderTime}`);
-    const reminder: Reminder = {
-      id: crypto.randomUUID(),
-      text: newReminderText,
-      dueDate,
-      completed: false,
-      notified: false
+    // Clear state immediately if session is null (logout)
+    if (!session) {
+      setSessions([]);
+      setMessages([]);
+      setCurrentSessionId(null);
+    }
+    
+    // Load sessions from Supabase or LocalStorage when session changes
+    loadSessions(!!currentSessionId);
+
+    return () => clearTimeout(timer);
+  }, [session]);
+
+  const translations: any = {
+    'Español': {
+      welcomeBrother: '¡As-salamu alaykum! Bienvenido de nuevo, hermano. ¿En qué puedo ayudarte hoy?',
+      welcomeSister: '¡As-salamu alaykum! Bienvenida de nuevo, hermana. ¿En qué puedo ayudarte hoy?',
+      error: 'Lo siento, ha ocurrido un error al procesar tu solicitud. Por favor, inténtalo de nuevo.',
+      newChat: 'Nueva conversación',
+      placeholder: 'Pregunta sobre el Islam...',
+      searchQuran: 'Buscar Corán',
+      you: 'Tú',
+      history: 'Historial de Chats',
+      noHistory: 'Sin historial',
+      explore: 'Explorar',
+      surahLib: 'Biblioteca de Suras',
+      quranSearch: 'Buscador del Corán',
+      islamicCalendar: 'Calendario Islámico',
+      hadith: 'Hadith',
+      prayerTimes: 'Oraciones',
+      clearHistory: 'Borrar Historial',
+      confirmClear: '¿Estás seguro de que quieres borrar todos los chats?',
+      premium: 'Premium',
+      proDesc: 'Acceso ilimitado, respuestas profundas y soporte prioritario.',
+      upgrade: 'Mejorar Ahora',
+      viewPlan: 'Ver Plan',
+      settings: 'Ajustes',
+      about: 'Sobre Deenly',
+      logout: 'Cerrar Sesión',
+      disclaimer: 'Deenly puede cometer errores. Considera verificar la información.',
+      dailyInspiration: 'Inspiración Diaria'
+    },
+    'English': {
+      welcomeBrother: 'As-salamu alaykum! Welcome back, brother. How can I help you today?',
+      welcomeSister: 'As-salamu alaykum! Welcome back, sister. How can I help you today?',
+      error: 'I am sorry, an error occurred while processing your request. Please try again.',
+      newChat: 'New Conversation',
+      placeholder: 'Ask about Islam...',
+      searchQuran: 'Search Quran',
+      you: 'You',
+      history: 'Chat History',
+      noHistory: 'No history',
+      explore: 'Explore',
+      surahLib: 'Surah Library',
+      quranSearch: 'Quran Search',
+      islamicCalendar: 'Islamic Calendar',
+      hadith: 'Hadith',
+      prayerTimes: 'Prayer Times',
+      clearHistory: 'Clear History',
+      confirmClear: 'Are you sure you want to clear all chats?',
+      premium: 'Premium',
+      proDesc: 'Unlimited access, deep answers, and priority support.',
+      upgrade: 'Upgrade Now',
+      viewPlan: 'View Plan',
+      settings: 'Settings',
+      about: 'About Deenly',
+      logout: 'Log Out',
+      disclaimer: 'Deenly can make mistakes. Consider verifying the information.',
+      dailyInspiration: 'Daily Inspiration'
+    },
+    'Français': {
+      welcomeBrother: 'As-salamu alaykum ! Bon retour, mon frère. Comment puis-je t\'aider aujourd\'hui ?',
+      welcomeSister: 'As-salamu alaykum ! Bon retour, ma sœur. Comment puis-je t\'aider aujourd\'hui ?',
+      error: 'Désolé, une erreur s\'est produite lors du traitement de votre demande. Veuillez réessayer.',
+      newChat: 'Nouvelle conversation',
+      placeholder: 'Posez une question sur l\'Islam...',
+      searchQuran: 'Chercher dans le Coran',
+      you: 'Vous',
+      history: 'Historique des discussions',
+      noHistory: 'Aucun historique',
+      explore: 'Explorer',
+      surahLib: 'Bibliothèque de Sourates',
+      quranSearch: 'Recherche Coran',
+      islamicCalendar: 'Calendrier Islamique',
+      hadith: 'Hadith',
+      prayerTimes: 'Prières',
+      clearHistory: 'Effacer l\'historique',
+      confirmClear: 'Êtes-vous sûr de vouloir effacer tous les chats ?',
+      premium: 'Premium',
+      proDesc: 'Accès illimité, réponses approfondies et support prioritaire.',
+      upgrade: 'Améliorer maintenant',
+      viewPlan: 'Voir le plan',
+      settings: 'Paramètres',
+      about: 'À propos de Deenly',
+      logout: 'Déconnexion',
+      disclaimer: 'Deenly peut faire des erreurs. Pensez à vérifier les informations.',
+      dailyInspiration: 'Inspiration Quotidienne'
+    },
+    'العربية': {
+      welcomeBrother: 'السلام عليكم! أهلاً بك من جديد يا أخي. كيف يمكنني مساعدتك اليوم؟',
+      welcomeSister: 'السلام عليكم! أهلاً بكِ من جديد يا أختي. كيف يمكنني مساعدتك اليوم؟',
+      error: 'عذرًا، حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى.',
+      newChat: 'محادثة جديدة',
+      placeholder: 'اسأل عن الإسلام...',
+      searchQuran: 'البحث في القرآن',
+      you: 'أنت',
+      history: 'سجل الدردشة',
+      noHistory: 'لا يوجد سجل',
+      explore: 'استكشاف',
+      surahLib: 'مكتبة السور',
+      quranSearch: 'البحث في القرآن',
+      islamicCalendar: 'التقويم الهجري',
+      hadith: 'الحديث',
+      prayerTimes: 'مواقيت الصلاة',
+      clearHistory: 'مسح السجل',
+      confirmClear: 'هل أنت متأكد أنك تريد مسح جميع المحادثات؟',
+      premium: 'بريميوم',
+      proDesc: 'وصول غير محدود، إجابات عميقة، ودعم ذو أولوية.',
+      upgrade: 'ترقية الآن',
+      viewPlan: 'عرض الخطة',
+      settings: 'الإعدادات',
+      about: 'حول Deenly',
+      logout: 'تسجيل الخروج',
+      disclaimer: 'قد يرتكب Deenly أخطاء. يرجى التحقق من المعلومات.',
+      dailyInspiration: 'إلهام يومي'
+    }
+  };
+
+  const t = translations[language] || translations['Español'];
+
+  const showToast = (message: string, type: 'error' | 'success' = 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 5000);
+  };
+
+  const loadSessions = async (preserveActive = false) => {
+    try {
+      const chats = await chatService.getChats();
+      if (chats && chats.length > 0) {
+        const formattedSessions: ChatSession[] = await Promise.all(chats.map(async (chat) => {
+          try {
+            const dbMessages = await chatService.getMessages(chat.id);
+            return {
+              id: chat.id,
+              title: chat.title,
+              lastUpdated: new Date(chat.created_at),
+              messages: dbMessages.map(m => ({
+                id: m.id,
+                role: m.role,
+                text: m.content,
+                timestamp: new Date(m.created_at)
+              }))
+            };
+          } catch (e) {
+            console.error(`Error loading messages for chat ${chat.id}:`, e);
+            return {
+              id: chat.id,
+              title: chat.title,
+              lastUpdated: new Date(chat.created_at),
+              messages: []
+            };
+          }
+        }));
+        
+        setSessions(formattedSessions);
+        
+        // If we want to preserve the active session, check if it still exists
+        if (preserveActive && currentSessionId) {
+          const current = formattedSessions.find(s => s.id === currentSessionId);
+          if (current) {
+            setMessages(current.messages);
+            return;
+          }
+        }
+
+        // Default to the most recent session
+        setCurrentSessionId(formattedSessions[0].id);
+        setMessages(formattedSessions[0].messages);
+      } else {
+        // Check if there are local sessions to migrate or just start fresh
+        const localSessions = localStorage.getItem('deenly_local_sessions');
+        if (localSessions) {
+          try {
+            const parsed = JSON.parse(localSessions).map((s: any) => ({
+              ...s,
+              lastUpdated: new Date(s.lastUpdated),
+              messages: s.messages.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
+            }));
+            
+            if (parsed.length > 0) {
+              if (session && isSupabaseConfigured) {
+                // Migrate local sessions to Supabase
+                showToast('Sincronizando historial local...', 'success');
+                try {
+                  for (const s of parsed) {
+                    // Create the chat in Supabase
+                    const newChat = await chatService.createChat(s.title);
+                    // Add all messages to the new chat
+                    for (const m of s.messages) {
+                      await chatService.addMessage(newChat.id, m.role, m.text);
+                    }
+                  }
+                  // Clear local sessions after successful migration
+                  localStorage.removeItem('deenly_local_sessions');
+                  // Reload from Supabase to get the real IDs and associated data
+                  await loadSessions(preserveActive);
+                  return;
+                } catch (migrateError: any) {
+                  console.error('Error migrating sessions:', migrateError);
+                  showToast('Error al sincronizar historial: ' + migrateError.message);
+                }
+              }
+              
+              setSessions(parsed);
+              setCurrentSessionId(parsed[0].id);
+              setMessages(parsed[0].messages);
+              return;
+            }
+          } catch (e) {
+            console.error('Error parsing local sessions:', e);
+            localStorage.removeItem('deenly_local_sessions');
+          }
+        }
+        await createInitialChat();
+      }
+    } catch (error: any) {
+      console.error('Error loading sessions:', error);
+      showToast(error.message || 'Error al cargar las conversaciones');
+      
+      // ONLY fallback to local storage if NOT logged in
+      if (!session) {
+        const localSessions = localStorage.getItem('deenly_local_sessions');
+        if (localSessions) {
+          const parsed = JSON.parse(localSessions).map((s: any) => ({
+            ...s,
+            lastUpdated: new Date(s.lastUpdated),
+            messages: s.messages.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
+          }));
+          setSessions(parsed);
+          if (parsed.length > 0) {
+            setCurrentSessionId(parsed[0].id);
+            setMessages(parsed[0].messages);
+          }
+        } else {
+          startInitialChat();
+        }
+      } else {
+        // If logged in and cloud fetch fails, show empty state for safety
+        setSessions([]);
+        setMessages([]);
+        setCurrentSessionId(null);
+      }
+    }
+  };
+
+  // Save sessions to localStorage as backup ONLY if not logged in
+  useEffect(() => {
+    if (sessions.length > 0 && !session) {
+      localStorage.setItem('deenly_local_sessions', JSON.stringify(sessions));
+    }
+  }, [sessions, session]);
+
+  const getWelcomeMessage = () => {
+    const gender = session?.user?.user_metadata?.settings?.gender || session?.user?.user_metadata?.onboarding?.gender || 'Hermano';
+    return gender === 'Hermana' ? t.welcomeSister : t.welcomeBrother;
+  };
+
+  const createInitialChat = async () => {
+    try {
+      const newChat = await chatService.createChat(t.newChat);
+      const initialMessageText = getWelcomeMessage();
+      const dbMsg = await chatService.addMessage(newChat.id, 'assistant', initialMessageText);
+      
+      const initialMessage: Message = {
+        id: dbMsg.id,
+        role: 'assistant',
+        text: initialMessageText,
+        timestamp: new Date(dbMsg.created_at)
+      };
+
+      const initialSession: ChatSession = {
+        id: newChat.id,
+        title: newChat.title,
+        messages: [initialMessage],
+        lastUpdated: new Date(newChat.created_at)
+      };
+
+      setSessions([initialSession]);
+      setCurrentSessionId(initialSession.id);
+      setMessages([initialMessage]);
+    } catch (error: any) {
+      console.error('Error creating initial chat:', error);
+      showToast(error.message || 'Error al iniciar la conversación');
+      startInitialChat();
+    }
+  };
+
+  const startInitialChat = () => {
+    const initialMessage: Message = {
+      id: '1',
+      role: 'assistant',
+      text: getWelcomeMessage(),
+      timestamp: new Date()
     };
-    
-    setReminders(prev => [...prev, reminder]);
-    setNewReminderText('');
-    setNewReminderDate('');
-    setNewReminderTime('');
+    const initialSession: ChatSession = {
+      id: Date.now().toString(),
+      title: t.newChat,
+      messages: [initialMessage],
+      lastUpdated: new Date()
+    };
+    setSessions([initialSession]);
+    setCurrentSessionId(initialSession.id);
+    setMessages([initialMessage]);
   };
 
-  const toggleReminder = (id: string) => {
-    setReminders(prev => prev.map(r => r.id === id ? { ...r, completed: !r.completed } : r));
+  const createNewChat = async () => {
+    try {
+      const newChat = await chatService.createChat(t.newChat);
+      const initialMessageText = getWelcomeMessage();
+      const dbMsg = await chatService.addMessage(newChat.id, 'assistant', initialMessageText);
+
+      const initialMessage: Message = {
+        id: dbMsg.id,
+        role: 'assistant',
+        text: initialMessageText,
+        timestamp: new Date(dbMsg.created_at)
+      };
+
+      const newSession: ChatSession = {
+        id: newChat.id,
+        title: newChat.title,
+        messages: [initialMessage],
+        lastUpdated: new Date(newChat.created_at)
+      };
+
+      setSessions(prev => [newSession, ...prev]);
+      setCurrentSessionId(newSession.id);
+      setMessages([initialMessage]);
+      setIsSidebarOpen(false);
+    } catch (error: any) {
+      console.error('Error creating new chat:', error);
+      showToast(error.message || 'Error al crear nueva conversación');
+    }
   };
 
-  const deleteReminder = (id: string) => {
-    setReminders(prev => prev.filter(r => r.id !== id));
+  const switchChat = (sessionId: string) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (session) {
+      setCurrentSessionId(sessionId);
+      setMessages(session.messages);
+    }
+    setIsSidebarOpen(false);
   };
 
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
-    });
-  };
-
-  const handleShare = async (text: string, id: string) => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Respuesta de Deenly',
-          text: text,
-          url: window.location.href
-        });
-      } catch (error) {
-        if ((error as Error).name !== 'AbortError') {
-          copyToClipboard(text, id);
+  const deleteChat = async (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation();
+    if (!confirm(t.confirmClear)) return;
+    try {
+      await chatService.deleteChat(sessionId);
+      const newSessions = sessions.filter(s => s.id !== sessionId);
+      setSessions(newSessions);
+      if (currentSessionId === sessionId) {
+        if (newSessions.length > 0) {
+          switchChat(newSessions[0].id);
+        } else {
+          await createInitialChat();
         }
       }
-    } else {
-      copyToClipboard(text, id);
+      showToast('Conversación eliminada correctamente', 'success');
+    } catch (error: any) {
+      console.error('Error deleting chat:', error);
+      showToast(error.message || 'Error al eliminar la conversación');
     }
   };
 
-  const loadDailyCount = async (userId: string) => {
-    if (userId === 'guest') return;
-    const stored = localStorage.getItem(`deenly_count_${userId}_${new Date().toDateString()}`);
-    setQuestionsToday(stored ? parseInt(stored) : 0);
-  };
-
-  const incrementDailyCount = (userId: string) => {
-    if (userId === 'guest') return;
-    const newCount = questionsToday + 1;
-    setQuestionsToday(newCount);
-    localStorage.setItem(`deenly_count_${userId}_${new Date().toDateString()}`, newCount.toString());
-  };
-
-  const loadMessages = async (userId: string) => {
-    if (userId === 'guest') return;
-    setIsHistoryLoading(true);
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      console.error('Error loading messages:', error);
-    } else if (data) {
-      const loadedMessages = data.map(m => ({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-        timestamp: new Date(m.created_at),
-        user_id: m.user_id
-      }));
-      
-      if (loadedMessages.length === 0) {
-        setMessages([{
-          id: 'welcome',
-          role: 'assistant',
-          content: 'Assalamu alaikum. Soy Deenly, tu asistente educativo islámico. Puedo ayudarte a entender el Islam con claridad y respeto. Para asuntos personales o legales, consulta siempre a un erudito cualificado.',
-          timestamp: new Date()
-        }]);
-      } else {
-        setMessages(loadedMessages);
-      }
-    }
-    setIsHistoryLoading(false);
-  };
-
-  const loadMemories = async (userId: string) => {
-    if (userId === 'guest') return;
-    const { data, error } = await supabase
-      .from('user_memories')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error loading memories:', error);
-    } else if (data) {
-      setMemories(data);
+  const clearAllChats = async () => {
+    if (!confirm(t.confirmClear)) return;
+    try {
+      await chatService.clearAllChats();
+      setSessions([]);
+      setMessages([]);
+      setCurrentSessionId(null);
+      await createInitialChat();
+      showToast('Historial limpiado correctamente', 'success');
+    } catch (error: any) {
+      console.error('Error clearing all chats:', error);
+      showToast(error.message || 'Error al limpiar el historial');
     }
   };
 
-  const addMemory = async () => {
-    if (!newMemory.trim() || !user) return;
-    if (user.id === 'guest') {
-      const tempMemory: Memory = {
-        id: crypto.randomUUID(),
-        content: newMemory,
-        created_at: new Date().toISOString()
-      };
-      setMemories(prev => [tempMemory, ...prev]);
-      setNewMemory('');
-      return;
-    }
-    const { data, error } = await supabase
-      .from('user_memories')
-      .insert([{ content: newMemory, user_id: user.id }])
-      .select();
-
-    if (error) {
-      console.error('Error adding memory:', error);
-    } else if (data) {
-      setMemories(prev => [data[0], ...prev]);
-      setNewMemory('');
+  const deleteMessage = async (messageId: string) => {
+    try {
+      await chatService.deleteMessage(messageId);
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+    } catch (error: any) {
+      console.error('Error deleting message:', error);
+      showToast(error.message || 'Error al eliminar el mensaje');
     }
   };
 
-  const deleteMemory = async (id: string) => {
-    if (user?.id === 'guest') {
-      setMemories(prev => prev.filter(m => m.id !== id));
-      return;
-    }
-    const { error } = await supabase
-      .from('user_memories')
-      .delete()
-      .eq('id', id);
+  const startEditing = (message: Message) => {
+    setEditingMessageId(message.id);
+    setEditValue(message.text);
+  };
 
-    if (error) {
-      console.error('Error deleting memory:', error);
-    } else {
-      setMemories(prev => prev.filter(m => m.id !== id));
+  const saveEdit = async (messageId: string) => {
+    try {
+      await chatService.updateMessage(messageId, editValue);
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, text: editValue } : m));
+      setEditingMessageId(null);
+    } catch (error: any) {
+      console.error('Error updating message:', error);
+      showToast(error.message || 'Error al actualizar el mensaje');
     }
   };
 
-  const saveMessage = async (msg: Omit<Message, 'timestamp'>) => {
-    if (!user || user.id === 'guest') return;
-    const { error } = await supabase
-      .from('messages')
-      .insert([{
-        id: msg.id,
-        role: msg.role,
-        content: msg.content,
-        user_id: user.id
-      }]);
-    
-    if (error) console.error('Error saving message:', error);
-  };
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-  const clearMessages = async () => {
-    const welcomeMsg: Message = {
-      id: 'welcome',
-      role: 'assistant',
-      content: 'Assalamu alaikum. Soy Deenly, tu asistente educativo islámico. Puedo ayudarte a entender el Islam con claridad y respeto. Para asuntos personales o legales, consulta siempre a un erudito cualificado.',
+  const handleSend = async () => {
+    if (!input.trim() || isLoading || !currentSessionId) return;
+
+    const activeSessionId = currentSessionId;
+    const tempId = Date.now().toString();
+    const userMessage: Message = {
+      id: tempId,
+      role: 'user',
+      text: input,
       timestamp: new Date()
     };
 
-    if (!user) {
-      setMessages([welcomeMsg]);
-      setShowClearAllConfirm(false);
-      return;
-    }
-
-    if (user.id !== 'guest') {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .eq('user_id', user.id);
-      
-      if (error) {
-        console.error('Error clearing messages:', error);
-        setShowClearAllConfirm(false);
-        return;
-      }
-    }
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     
-    setMessages([welcomeMsg]);
-    setShowClearAllConfirm(false);
-  };
-
-  const deleteThread = (threadId: string) => {
-    setThreadToDelete(threadId);
-    setShowDeleteConfirm(true);
-  };
-
-  const confirmDeleteThread = async () => {
-    if (!threadToDelete) return;
-
-    const threadStartMsg = messages.find(m => m.id === threadToDelete);
-    if (!threadStartMsg) {
-      setShowDeleteConfirm(false);
-      setThreadToDelete(null);
-      return;
+    // Update session title if it's the first user message
+    let updatedTitle = sessions.find(s => s.id === activeSessionId)?.title || 'Nueva conversación';
+    if (messages.length <= 1) {
+      updatedTitle = input.slice(0, 30) + (input.length > 30 ? '...' : '');
+      await chatService.updateChatTitle(activeSessionId, updatedTitle);
     }
 
-    const startIndex = messages.indexOf(threadStartMsg);
-    let endIndex = messages.length;
-    for (let i = startIndex + 1; i < messages.length; i++) {
-      if (messages[i].timestamp.getTime() - messages[i-1].timestamp.getTime() > 1000 * 60 * 60 * 2) {
-        endIndex = i;
-        break;
-      }
-    }
-
-    const threadMessages = messages.slice(startIndex, endIndex);
-    const messageIds = threadMessages.map(m => m.id);
-
-    if (user && user.id !== 'guest') {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .in('id', messageIds);
-      
-      if (error) {
-        console.error('Error deleting thread:', error);
-        setShowDeleteConfirm(false);
-        setThreadToDelete(null);
-        return;
-      }
-    }
-
-    setMessages(prev => prev.filter(m => !messageIds.includes(m.id)));
-    if (activeThreadId === threadToDelete) {
-      setActiveThreadId(null);
-    }
-    setShowDeleteConfirm(false);
-    setThreadToDelete(null);
-  };
-
-  const toggleStarThread = async (threadId: string) => {
-    const threadStartMsg = messages.find(m => m.id === threadId);
-    if (!threadStartMsg) return;
-
-    const isCurrentlyStarred = threadStartMsg.is_starred;
-    const startIndex = messages.indexOf(threadStartMsg);
-    let endIndex = messages.length;
-    for (let i = startIndex + 1; i < messages.length; i++) {
-      if (messages[i].timestamp.getTime() - messages[i-1].timestamp.getTime() > 1000 * 60 * 60 * 2) {
-        endIndex = i;
-        break;
-      }
-    }
-
-    const threadMessages = messages.slice(startIndex, endIndex);
-    const messageIds = threadMessages.map(m => m.id);
-
-    if (user && user.id !== 'guest') {
-      const { error } = await supabase
-        .from('messages')
-        .update({ is_starred: !isCurrentlyStarred })
-        .in('id', messageIds);
-      
-      if (error) {
-        console.error('Error toggling star:', error);
-        // Continue anyway to update local state
-      }
-    }
-
-    setMessages(prev => prev.map(m => 
-      messageIds.includes(m.id) ? { ...m, is_starred: !isCurrentlyStarred } : m
+    setSessions(prev => prev.map(s => 
+      s.id === activeSessionId 
+        ? { ...s, messages: updatedMessages, title: updatedTitle, lastUpdated: new Date() } 
+        : s
     ));
-  };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+    setInput('');
+    setIsLoading(true);
 
-  const groupMessagesIntoThreads = (msgs: Message[]) => {
-    const threads: { id: string, title: string, date: Date, messageCount: number, isStarred: boolean }[] = [];
-    if (msgs.length === 0) return threads;
-
-    let currentThreadMsgs: Message[] = [msgs[0]];
-    
-    const pushThread = (msgs: Message[]) => {
-      const userMsg = msgs.find(m => m.role === 'user');
-      threads.push({
-        id: msgs[0].id,
-        title: userMsg ? userMsg.content.substring(0, 40) + (userMsg.content.length > 40 ? '...' : '') : 'Conversación',
-        date: msgs[0].timestamp,
-        messageCount: msgs.length,
-        isStarred: msgs.some(m => m.is_starred)
-      });
-    };
-
-    for (let i = 1; i < msgs.length; i++) {
-      const prev = msgs[i-1];
-      const curr = msgs[i];
-      const diff = curr.timestamp.getTime() - prev.timestamp.getTime();
-      
-      if (diff > 1000 * 60 * 60 * 2) { // 2 hours gap
-        pushThread(currentThreadMsgs);
-        currentThreadMsgs = [curr];
-      } else {
-        currentThreadMsgs.push(curr);
-      }
-    }
-    
-    pushThread(currentThreadMsgs);
-    return threads.reverse(); // Newest first
-  };
-
-  const chatThreads = groupMessagesIntoThreads(messages)
-    .filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
-    .sort((a, b) => {
-      if (a.isStarred && !b.isStarred) return -1;
-      if (!a.isStarred && b.isStarred) return 1;
-      return 0; // Maintain date sorting within groups
-    });
-  
-  const filteredMessages = activeThreadId 
-    ? (() => {
-        if (activeThreadId === 'new') return [];
-        
-        const threadStartMsg = messages.find(m => m.id === activeThreadId);
-        if (!threadStartMsg) return [];
-        
-        const startIndex = messages.indexOf(threadStartMsg);
-        let endIndex = messages.length;
-        for (let i = startIndex + 1; i < messages.length; i++) {
-          if (messages[i].timestamp.getTime() - messages[i-1].timestamp.getTime() > 1000 * 60 * 60 * 2) {
-            endIndex = i;
-            break;
-          }
-        }
-        return messages.slice(startIndex, endIndex);
-      })()
-    : (() => {
-        if (messages.length === 0) return [];
-        
-        // Check if latest thread is "active" (last message < 2h ago)
-        const lastMsg = messages[messages.length - 1];
-        const now = new Date();
-        if (now.getTime() - lastMsg.timestamp.getTime() > 1000 * 60 * 60 * 2) {
-          return [];
-        }
-
-        let lastThreadStart = 0;
-        for (let i = 1; i < messages.length; i++) {
-          if (messages[i].timestamp.getTime() - messages[i-1].timestamp.getTime() > 1000 * 60 * 60 * 2) {
-            lastThreadStart = i;
-          }
-        }
-        return messages.slice(lastThreadStart);
-      })();
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  useEffect(() => {
-    setAuthMessage(null);
-  }, [isRegistering]);
-
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!authEmail.trim() || !authPassword.trim()) return;
-    if (isRegistering && (!authName.trim() || !authSurname.trim() || !authAge.trim())) return;
-    
-    setAuthLoading(true);
-    setAuthMessage(null);
-    
     try {
-      if (isRegistering) {
-        const { data, error } = await supabase.auth.signUp({
-          email: authEmail,
-          password: authPassword,
-          options: {
-            data: {
-              first_name: authName,
-              last_name: authSurname,
-              age: parseInt(authAge),
-            }
-          }
-        });
-        if (error) throw error;
-        setAuthMessage({ 
-          type: 'success', 
-          text: '¡Cuenta creada! Revisa tu email para confirmar tu cuenta e iniciar sesión.' 
-        });
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: authEmail,
-          password: authPassword,
-        });
-        if (error) throw error;
-        setShowAuthModal(false);
-      }
-    } catch (error: any) {
-      setAuthMessage({ 
-        type: 'error', 
-        text: error.message || 'Error en la autenticación.' 
+      // Save user message to DB
+      const dbUserMsg = await chatService.addMessage(activeSessionId, 'user', input);
+      
+      const history: GeminiChatMessage[] = updatedMessages.slice(-6).map(m => ({
+        role: m.role,
+        parts: [{ text: m.text }]
+      }));
+      
+      const response = await getMuftiResponse(input, history, [], isPremium, session?.user?.user_metadata);
+      
+      // Save model response to DB
+      const dbModelMsg = await chatService.addMessage(activeSessionId, 'assistant', response);
+
+      const modelMessage: Message = {
+        id: dbModelMsg.id,
+        role: 'assistant',
+        text: response,
+        timestamp: new Date(dbModelMsg.created_at)
+      };
+      
+      const finalMessages = [...updatedMessages.filter(m => m.id !== tempId), { ...userMessage, id: dbUserMsg.id }, modelMessage];
+      
+      // Only update current messages if we are still on the same session
+      setCurrentSessionId(prev => {
+        if (prev === activeSessionId) {
+          setMessages(finalMessages);
+        }
+        return prev;
       });
+
+      setSessions(prev => prev.map(s => 
+        s.id === activeSessionId 
+          ? { ...s, messages: finalMessages, lastUpdated: new Date() } 
+          : s
+      ));
+    } catch (error: any) {
+      console.error('Error:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        text: error.message || t.error,
+        timestamp: new Date()
+      };
+      const finalMessages = [...updatedMessages, errorMessage];
+      
+      setCurrentSessionId(prev => {
+        if (prev === activeSessionId) {
+          setMessages(finalMessages);
+        }
+        return prev;
+      });
+
+      setSessions(prev => prev.map(s => 
+        s.id === activeSessionId 
+          ? { ...s, messages: finalMessages, lastUpdated: new Date() } 
+          : s
+      ));
     } finally {
-      setAuthLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setMessages([]);
-  };
-
-  const togglePremium = async () => {
-    if (!user) return;
-    
-    const priceId = billingCycle === 'monthly' ? STRIPE_PRICE_MONTHLY : STRIPE_PRICE_YEARLY;
+  const handleUpgrade = async () => {
+    if (!session?.user) return;
     
     try {
       const response = await fetch('/api/create-checkout-session', {
@@ -685,1977 +707,490 @@ export default function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          priceId,
-          userId: user.id,
-          userEmail: user.email,
+          priceId: import.meta.env.VITE_STRIPE_PRICE_ID_PREMIUM || 'price_1T40qMDlissxr9xdar8montv',
+          userId: session.user.id,
+          userEmail: session.user.email,
         }),
       });
-
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        if (data.url) {
-          window.location.href = data.url;
-        } else {
-          throw new Error(data.error || 'No se pudo crear la sesión de pago');
-        }
-      } else {
-        const text = await response.text();
-        throw new Error(text || `Error del servidor (${response.status})`);
-      }
-    } catch (error: any) {
-      console.error('Error in Stripe checkout:', error);
-      alert(`Error al iniciar el pago: ${error.message}`);
-    }
-  };
-
-  const handleSend = async (text: string = input) => {
-    if (!text.trim() || isLoading) return;
-
-    // Check limits for free users
-    if (!isPremium && questionsToday >= 30) {
-      setShowLimitModal(true);
-      return;
-    }
-
-    const userMessage: Message = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: text,
-      timestamp: new Date(),
-      user_id: user?.id
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
-    setActiveThreadId(null);
-
-    if (user) {
-      await saveMessage(userMessage);
-      if (!isPremium) incrementDailyCount(user.id);
-    }
-
-    try {
-      // Prepare history for Gemini (last 10 messages for context)
-      const history: ChatMessage[] = messages.slice(-10).map(m => ({
-        role: m.role === 'user' ? 'user' as const : 'model' as const,
-        parts: [{ text: m.content }]
-      }));
-
-      // Prepare memories for Gemini
-      const memoryList = memories.map(m => m.content);
-
-      const response = await getMuftiResponse(text, history, memoryList, isPremium);
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: response || 'Lo siento, no pude procesar tu solicitud en este momento.',
-        timestamp: new Date(),
-        user_id: user?.id
-      };
-      setMessages(prev => [...prev, assistantMessage]);
-      if (user) await saveMessage(assistantMessage);
-    } catch (error: any) {
-      console.error('Error fetching response:', error);
-      let errorMessageText = 'Hubo un error al conectar con Deenly.';
       
-      if (error.message?.includes('Failed to fetch')) {
-        errorMessageText += ' Error de conexión (Failed to fetch). Por favor, verifica tu conexión a internet o la configuración de las claves API.';
-      } else {
-        errorMessageText += ` Detalle: ${error.message || 'Error desconocido'}`;
-      }
-
-      const errorMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: errorMessageText,
-        timestamp: new Date(),
-        user_id: user?.id
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
+      const { url, error } = await response.json();
+      if (error) throw new Error(error);
+      if (url) window.location.href = url;
+    } catch (error: any) {
+      console.error('Error creating checkout session:', error);
+      alert('Error al iniciar el proceso de pago. Por favor, inténtalo de nuevo.');
     }
   };
+
+  if (!session) {
+    return <Auth darkMode={darkMode} />;
+  }
 
   return (
-    <>
-      <AnimatePresence>
-        {showSplash && (
-          <motion.div 
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-deenly-cream flex flex-col items-center justify-center p-8 text-center"
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
-              className="space-y-6"
+    <div className={`min-h-screen flex flex-col transition-colors duration-500 ${
+      darkMode ? 'bg-deenly-dark-bg text-deenly-dark-text' : 'bg-deenly-cream text-deenly-green'
+    } ${
+      fontSize === 'small' ? 'text-sm' : fontSize === 'large' ? 'text-lg' : 'text-base'
+    }`}>
+      {showSplash && <Splash />}
+
+      {/* Header */}
+      <header className={`sticky top-0 z-40 border-b transition-colors duration-300 ${darkMode ? 'bg-deenly-dark-surface/90 border-deenly-gold/10' : 'bg-white/90 border-deenly-gold/10'} backdrop-blur-md`}>
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 hover:bg-deenly-gold/10 rounded-xl transition-colors text-deenly-gold"
             >
-              <div className="w-32 h-32 bg-deenly-green rounded-full flex items-center justify-center text-deenly-cream mx-auto shadow-2xl relative">
-                <Sparkles size={64} />
-                <motion.div 
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-0 border-2 border-deenly-gold/30 rounded-full border-dashed"
-                />
-              </div>
-              <div className="space-y-2">
-                <h1 className="text-6xl font-serif font-bold text-deenly-green tracking-tight">Deenly</h1>
-                <p className="text-deenly-gold font-medium tracking-widest uppercase text-xs">Tu guía espiritual IA</p>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className={cn(
-        "flex h-screen w-full transition-colors duration-300 overflow-hidden relative",
-        darkMode ? "bg-deenly-dark-bg text-deenly-dark-text" : "bg-deenly-cream text-deenly-green"
-      )}>
-      <AnimatePresence>
-        {showPremiumModal && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 bg-deenly-green/80 backdrop-blur-md overflow-y-auto"
-            onClick={() => setShowPremiumModal(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className={cn(
-                "max-w-4xl w-full shadow-2xl rounded-[2.5rem] overflow-hidden relative",
-                darkMode ? "bg-deenly-dark-surface" : "bg-white"
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header Section */}
-              <div className="bg-deenly-green p-8 sm:p-12 text-center text-deenly-white relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-full islamic-pattern opacity-10" />
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  className="relative z-10"
-                >
-                  <h3 className="text-3xl sm:text-4xl font-serif font-bold mb-4">Accede al conocimiento sin límites</h3>
-                  <p className="text-deenly-white/80 max-w-xl mx-auto text-sm sm:text-base">
-                    Profundiza en tu fe con respuestas más detalladas, sin límites diarios.
-                  </p>
-                  <div className="mt-6 flex items-center justify-center gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest text-deenly-gold">
-                    <Sparkles size={14} />
-                    <span>Más claridad. Más aprendizaje. Más crecimiento espiritual.</span>
-                  </div>
-                </motion.div>
-              </div>
-
-              {/* Comparison Section */}
-              <div className="p-6 sm:p-10">
-                {/* Billing Toggle */}
-                <div className="flex justify-center mb-10">
-                  <div className={cn(
-                    "p-1 rounded-2xl flex items-center gap-1 border border-deenly-gold/20",
-                    darkMode ? "bg-deenly-dark-bg" : "bg-deenly-cream/50"
-                  )}>
-                    <button
-                      onClick={() => setBillingCycle('monthly')}
-                      className={cn(
-                        "px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
-                        billingCycle === 'monthly' 
-                          ? "bg-deenly-green text-deenly-white shadow-lg" 
-                          : "text-deenly-green/40 hover:text-deenly-green"
-                      )}
-                    >
-                      Mensual
-                    </button>
-                    <button
-                      onClick={() => setBillingCycle('yearly')}
-                      className={cn(
-                        "px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all relative",
-                        billingCycle === 'yearly' 
-                          ? "bg-deenly-green text-deenly-white shadow-lg" 
-                          : "text-deenly-green/40 hover:text-deenly-green"
-                      )}
-                    >
-                      Anual
-                      <span className="absolute -top-2 -right-2 bg-deenly-gold text-white text-[8px] px-1.5 py-0.5 rounded-full animate-pulse">
-                        -30%
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-                  {/* Free Plan */}
-                  <div className={cn(
-                    "p-8 rounded-3xl border border-deenly-gold/10 flex flex-col",
-                    darkMode ? "bg-deenly-dark-bg/50" : "bg-deenly-cream/30"
-                  )}>
-                    <h4 className="text-xl font-serif text-deenly-green mb-6">Plan Gratuito</h4>
-                    <ul className="space-y-4 mb-8 flex-1">
-                      {[
-                        { text: "30 preguntas al día", included: true },
-                        { text: "Respuestas estándar", included: true },
-                        { text: "Sin historial ilimitado", included: false },
-                        { text: "Publicidad futura", included: false },
-                      ].map((item, i) => (
-                        <li key={i} className="flex items-center gap-3 text-sm">
-                          {item.included ? <Check size={16} className="text-deenly-green" /> : <X size={16} className="text-deenly-green/30" />}
-                          <span className={cn(item.included ? "text-deenly-green" : "text-deenly-green/40")}>{item.text}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <button 
-                      onClick={() => setShowPremiumModal(false)}
-                      className="w-full py-3 text-xs font-bold uppercase tracking-widest text-deenly-green/40 hover:text-deenly-green transition-colors"
-                    >
-                      Seguir gratis
-                    </button>
-                  </div>
-
-                  {/* Premium Plan */}
-                  <div className={cn(
-                    "p-8 rounded-3xl border-2 border-deenly-gold shadow-2xl relative flex flex-col transform md:scale-105 z-10",
-                    darkMode ? "bg-deenly-dark-surface" : "bg-white"
-                  )}>
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-deenly-gold text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg">
-                      ⭐ Más Popular
-                    </div>
-                    <h4 className="text-xl font-serif text-deenly-green mb-6 flex items-center gap-2">
-                      Plan Premium
-                    </h4>
-                    <ul className="space-y-4 mb-8 flex-1">
-                      {[
-                        "Preguntas ilimitadas",
-                        "Respuestas más detalladas",
-                        "Prioridad en generación",
-                        "Historial completo",
-                        "Sin anuncios",
-                        "Funciones exclusivas",
-                      ].map((text, i) => (
-                        <li key={i} className="flex items-center gap-3 text-sm">
-                          <Check size={16} className="text-deenly-gold" />
-                          <span className="text-deenly-green font-medium">{text}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    
-                    <div className="mb-8 text-center">
-                      <AnimatePresence mode="wait">
-                        <motion.div 
-                          key={billingCycle}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className="flex flex-col items-center"
-                        >
-                          <div className="flex items-baseline justify-center gap-1">
-                            <span className="text-4xl font-serif font-bold text-deenly-green">
-                              {billingCycle === 'monthly' ? '4,99 €' : '39,99 €'}
-                            </span>
-                            <span className="text-sm text-deenly-green/40">
-                              {billingCycle === 'monthly' ? '/ mes' : '/ año'}
-                            </span>
-                          </div>
-                          <p className="text-[10px] font-bold text-deenly-gold uppercase tracking-widest mt-1">
-                            {billingCycle === 'monthly' 
-                              ? 'Cobrado mensualmente' 
-                              : 'Ahorra 30% con el plan anual'}
-                          </p>
-                        </motion.div>
-                      </AnimatePresence>
-                    </div>
-
-                    <button 
-                      onClick={togglePremium}
-                      className="w-full py-4 bg-deenly-green text-deenly-white rounded-2xl font-bold shadow-xl hover:bg-deenly-green/90 transition-all flex items-center justify-center gap-2"
-                    >
-                      {isPremium ? 'Gestionar Suscripción' : 'Activar Premium'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Trust Triggers */}
-                <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                  {[
-                    { icon: <Check size={14} />, text: "Cancelar cuando quieras" },
-                    { icon: <Moon size={14} />, text: "Diseñado para la Ummah" },
-                    { icon: <BookOpen size={14} />, text: "Basado en principios" },
-                    { icon: <Sparkles size={14} />, text: "Consultas ilimitadas" },
-                  ].map((item, i) => (
-                    <div key={i} className="flex flex-col items-center gap-2">
-                      <div className="text-deenly-gold">{item.icon}</div>
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-deenly-green/40">{item.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              <button 
-                onClick={() => setShowPremiumModal(false)}
-                className="absolute top-6 right-6 p-2 text-deenly-white/60 hover:text-deenly-white transition-colors"
-              >
-                <X size={24} />
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showLimitModal && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[65] flex items-center justify-center p-6 bg-deenly-green/40 backdrop-blur-sm"
-            onClick={() => setShowLimitModal(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className={cn(
-                "p-8 rounded-[2.5rem] max-w-md w-full shadow-2xl border border-deenly-gold/30 text-center",
-                darkMode ? "bg-deenly-dark-surface text-deenly-dark-text" : "bg-white text-deenly-green"
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="w-20 h-20 bg-deenly-gold/10 rounded-full flex items-center justify-center text-deenly-gold mx-auto mb-6">
-                <Sparkles size={40} />
-              </div>
-              <h3 className="text-2xl font-serif font-bold mb-3">Has alcanzado tus 30 preguntas gratuitas de hoy</h3>
-              <p className="text-sm opacity-60 mb-8 leading-relaxed">
-                Actualiza a Premium para preguntas ilimitadas y respuestas más detalladas.
-              </p>
-              
-              <div className="space-y-3">
-                <button 
-                  onClick={() => { setShowLimitModal(false); setShowPremiumModal(true); }}
-                  className="w-full py-4 bg-deenly-green text-deenly-cream rounded-full font-bold shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
-                >
-                  Actualizar a Premium
-                </button>
-                <button 
-                  onClick={() => setShowLimitModal(false)}
-                  className="w-full py-4 border border-deenly-gold/20 text-deenly-gold rounded-full font-bold hover:bg-deenly-gold/5 transition-all"
-                >
-                  Volver mañana
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showMemoryModal && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-deenly-green/40 backdrop-blur-sm"
-            onClick={() => setShowMemoryModal(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className={cn(
-                "p-8 rounded-3xl max-w-md w-full shadow-2xl border border-deenly-gold/20 flex flex-col max-h-[80vh]",
-                darkMode ? "bg-deenly-dark-surface text-deenly-dark-text" : "bg-deenly-cream text-deenly-green"
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 rounded-full bg-deenly-gold/10 text-deenly-gold">
-                  <Brain size={24} />
-                </div>
-                <h3 className="text-3xl font-serif text-deenly-green">Memoria de Deenly</h3>
-              </div>
-              
-              <p className="text-deenly-green/60 text-sm mb-6">
-                Aquí puedes guardar datos sobre ti que Deenly recordará en todas tus conversaciones (ej: "Soy estudiante", "Vivo en México").
-              </p>
-
-              <div className="flex gap-2 mb-6">
-                <input 
-                  type="text" 
-                  value={newMemory}
-                  onChange={(e) => setNewMemory(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addMemory()}
-                  placeholder="Añadir algo para recordar..."
-                  className="flex-1 bg-white border border-deenly-gold/20 rounded-xl py-2 px-4 focus:outline-none focus:ring-2 focus:ring-deenly-gold/30 text-sm"
-                />
-                <button 
-                  onClick={addMemory}
-                  className="p-2 bg-deenly-green text-deenly-cream rounded-xl hover:bg-deenly-green/90 transition-all"
-                >
-                  <Plus size={20} />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-hide">
-                {memories.length === 0 ? (
-                  <div className="text-center py-8 text-deenly-green/30 italic text-sm">
-                    No hay memorias guardadas aún.
-                  </div>
-                ) : (
-                  memories.map((m) => (
-                    <motion.div 
-                      key={m.id}
-                      layout
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className={cn(
-                        "flex items-center justify-between p-3 rounded-xl border border-deenly-gold/10 group",
-                        darkMode ? "bg-deenly-dark-bg" : "bg-white"
-                      )}
-                    >
-                      <span className="text-sm text-deenly-green/80">{m.content}</span>
-                      <button 
-                        onClick={() => deleteMemory(m.id)}
-                        className="p-1 text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 transition-all"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </motion.div>
-                  ))
-                )}
-              </div>
-
-              <button 
-                onClick={() => setShowMemoryModal(false)}
-                className="w-full mt-6 py-3 bg-deenly-green text-deenly-cream rounded-full font-medium hover:bg-deenly-green/90 transition-all"
-              >
-                Cerrar
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Profile Modal */}
-      <AnimatePresence>
-        {showProfileModal && user && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-deenly-green/40 backdrop-blur-sm"
-            onClick={() => setShowProfileModal(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className={cn(
-                "p-8 rounded-[2.5rem] max-w-md w-full shadow-2xl border border-deenly-gold/20",
-                darkMode ? "bg-deenly-dark-surface text-deenly-dark-text" : "bg-white text-deenly-green"
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex flex-col items-center text-center mb-8">
-                <div className="w-24 h-24 rounded-full bg-deenly-gold/10 flex items-center justify-center text-deenly-gold mb-4 border-2 border-deenly-gold/20">
-                  <User size={48} />
-                </div>
-                <h3 className="text-2xl font-serif font-bold">{user.user_metadata?.name || 'Usuario'}</h3>
-                <p className="text-sm opacity-50">{user.email}</p>
-                <div className="mt-3 px-3 py-1 rounded-full bg-deenly-gold/10 text-deenly-gold text-[10px] font-bold uppercase tracking-widest border border-deenly-gold/20">
-                  Plan {isPremium ? 'Premium' : 'Gratuito'}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <button 
-                  onClick={() => { setShowProfileModal(false); scrollToBottom(); }}
-                  className="w-full p-4 rounded-2xl border border-deenly-gold/10 flex items-center gap-3 hover:bg-deenly-gold/5 transition-all group"
-                >
-                  <History size={20} className="text-deenly-gold" />
-                  <span className="flex-1 text-left font-medium">Ver historial de chat</span>
-                  <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                </button>
-
-                <button 
-                  onClick={() => { setShowProfileModal(false); setShowMemoryModal(true); }}
-                  className="w-full p-4 rounded-2xl border border-deenly-gold/10 flex items-center gap-3 hover:bg-deenly-gold/5 transition-all group"
-                >
-                  <Brain size={20} className="text-deenly-gold" />
-                  <span className="flex-1 text-left font-medium">Ver historial de memoria</span>
-                  <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                </button>
-                
-                <button 
-                  onClick={() => { setShowProfileModal(false); setShowPremiumModal(true); }}
-                  className="w-full p-4 rounded-2xl border border-deenly-gold/10 flex items-center gap-3 hover:bg-deenly-gold/5 transition-all group"
-                >
-                  <Sparkles size={20} className="text-deenly-gold" />
-                  <span className="flex-1 text-left font-medium">{isPremium ? 'Gestionar plan' : 'Cambiar a Premium'}</span>
-                  <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                </button>
-
-                {isPremium && (
-                  <button 
-                    onClick={() => { setShowProfileModal(false); setShowCancelModal(true); setCancelStep('reason'); }}
-                    className="w-full p-4 rounded-2xl border border-deenly-gold/5 flex items-center gap-3 hover:bg-red-50 hover:text-red-500 transition-all group opacity-40 hover:opacity-100"
-                  >
-                    <AlertTriangle size={20} />
-                    <span className="flex-1 text-left font-medium">Cancelar suscripción</span>
-                  </button>
-                )}
-
-                <button 
-                  onClick={() => { setShowProfileModal(false); handleLogout(); }}
-                  className="w-full p-4 rounded-2xl border border-red-100 text-red-500 flex items-center gap-3 hover:bg-red-50 transition-all group"
-                >
-                  <LogOut size={20} />
-                  <span className="flex-1 text-left font-medium">Cerrar sesión</span>
-                </button>
-              </div>
-
-              <button 
-                onClick={() => setShowProfileModal(false)}
-                className="w-full mt-8 py-4 bg-deenly-green text-deenly-cream rounded-full font-bold shadow-lg hover:bg-deenly-green/90 transition-all"
-              >
-                Aceptar
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Cancellation Modal */}
-      <AnimatePresence>
-        {showCancelModal && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[80] flex items-center justify-center p-6 bg-deenly-green/60 backdrop-blur-md"
-            onClick={() => setShowCancelModal(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className={cn(
-                "p-8 rounded-[2.5rem] max-w-lg w-full shadow-2xl border border-deenly-gold/20 relative overflow-hidden",
-                darkMode ? "bg-deenly-dark-surface text-deenly-dark-text" : "bg-white text-deenly-green"
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-deenly-gold/5 rounded-full -mr-16 -mt-16 blur-3xl" />
-              
-              {cancelStep === 'reason' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  <h3 className="text-3xl font-serif font-bold mb-2">Antes de irte...</h3>
-                  <p className="text-sm opacity-60 mb-8">Lamentamos mucho que quieras dejarnos. Tu apoyo ayuda a mantener Deenly para toda la Ummah.</p>
-                  
-                  <div className="bg-deenly-gold/5 p-6 rounded-3xl mb-8 border border-deenly-gold/10">
-                    <p className="text-xs font-bold uppercase tracking-widest text-deenly-gold mb-4">Perderás estos beneficios:</p>
-                    <div className="space-y-3">
-                      {[
-                        "Preguntas ilimitadas diarias",
-                        "Historial completo de conversaciones",
-                        "Prioridad en respuestas de la IA",
-                        "Acceso a funciones exclusivas"
-                      ].map((benefit, i) => (
-                        <div key={i} className="flex items-center gap-3 text-sm">
-                          <X size={14} className="text-red-400" />
-                          <span className="opacity-70">{benefit}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <p className="text-xs font-bold uppercase tracking-widest text-deenly-gold mb-4">¿Por qué quieres cancelar?</p>
-                  <div className="grid grid-cols-1 gap-2 mb-8">
-                    {[
-                      { id: 'price', label: 'Es demasiado caro' },
-                      { id: 'usage', label: 'No lo uso lo suficiente' },
-                      { id: 'features', label: 'Faltan funciones' },
-                      { id: 'technical', label: 'Problemas técnicos' },
-                      { id: 'other', label: 'Otro motivo' }
-                    ].map((reason) => (
-                      <button
-                        key={reason.id}
-                        onClick={() => setSelectedReason(reason.id)}
-                        className={cn(
-                          "w-full p-4 rounded-xl border text-left text-sm transition-all",
-                          selectedReason === reason.id 
-                            ? "border-deenly-gold bg-deenly-gold/10 text-deenly-gold" 
-                            : "border-deenly-gold/10 hover:bg-deenly-gold/5"
-                        )}
-                      >
-                        {reason.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    <button 
-                      disabled={!selectedReason}
-                      onClick={() => setCancelStep('offer')}
-                      className="w-full py-4 bg-deenly-green text-deenly-cream rounded-full font-bold shadow-xl hover:bg-deenly-green/90 transition-all disabled:opacity-50"
-                    >
-                      Continuar
-                    </button>
-                    <button 
-                      onClick={() => setShowCancelModal(false)}
-                      className="w-full py-2 text-xs font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity"
-                    >
-                      Mantener mi suscripción
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-
-              {cancelStep === 'offer' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  <div className="w-16 h-16 rounded-2xl bg-deenly-gold/10 flex items-center justify-center text-deenly-gold mb-6">
-                    <Sparkles size={32} />
-                  </div>
-                  <h3 className="text-3xl font-serif font-bold mb-2">Tenemos una propuesta para ti</h3>
-                  <p className="text-sm opacity-60 mb-8">Queremos que sigas creciendo espiritualmente con nosotros. Mira lo que podemos ofrecerte:</p>
-                  
-                  <div className="space-y-4 mb-8">
-                    {selectedReason === 'price' && (
-                      <div className="p-6 rounded-3xl border-2 border-deenly-gold bg-deenly-gold/5 text-center">
-                        <p className="text-xs font-bold uppercase tracking-widest text-deenly-gold mb-2">Oferta Especial</p>
-                        <p className="text-xl font-serif font-bold mb-2">50% de descuento por 3 meses</p>
-                        <p className="text-sm opacity-60">Paga solo €2.49/mes y mantén todos tus beneficios.</p>
-                      </div>
-                    )}
-                    {selectedReason === 'usage' && (
-                      <div className="p-6 rounded-3xl border-2 border-deenly-gold bg-deenly-gold/5 text-center">
-                        <PauseCircle size={32} className="mx-auto text-deenly-gold mb-4" />
-                        <p className="text-xs font-bold uppercase tracking-widest text-deenly-gold mb-2">Pausar Suscripción</p>
-                        <p className="text-xl font-serif font-bold mb-2">Pausa por 1 mes gratis</p>
-                        <p className="text-sm opacity-60">No pierdas tu historial ni tus beneficios. Vuelve cuando estés listo.</p>
-                      </div>
-                    )}
-                    {(selectedReason === 'features' || selectedReason === 'technical' || selectedReason === 'other') && (
-                      <div className="p-6 rounded-3xl border-2 border-deenly-gold bg-deenly-gold/5 text-center">
-                        <ShieldCheck size={32} className="mx-auto text-deenly-gold mb-4" />
-                        <p className="text-xs font-bold uppercase tracking-widest text-deenly-gold mb-2">Soporte Prioritario</p>
-                        <p className="text-xl font-serif font-bold mb-2">Habla con nuestro equipo</p>
-                        <p className="text-sm opacity-60">Cuéntanos qué necesitas y lo priorizaremos en nuestra hoja de ruta.</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    <button 
-                      onClick={() => setShowCancelModal(false)}
-                      className="w-full py-4 bg-deenly-green text-deenly-cream rounded-full font-bold shadow-xl hover:bg-deenly-green/90 transition-all"
-                    >
-                      Aceptar oferta y seguir
-                    </button>
-                    <button 
-                      onClick={() => setCancelStep('confirm')}
-                      className="w-full py-2 text-xs font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity"
-                    >
-                      No, prefiero cancelar
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-
-              {cancelStep === 'confirm' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
-                  <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center text-red-500 mx-auto mb-6">
-                    <AlertTriangle size={32} />
-                  </div>
-                  <h3 className="text-3xl font-serif font-bold mb-2">¿Estás seguro?</h3>
-                  <p className="text-sm opacity-60 mb-8">Tu suscripción finalizará al terminar el periodo actual. Perderás el acceso a todas las funciones Premium.</p>
-                  
-                  <div className="flex flex-col gap-3">
-                    <button 
-                      onClick={() => setShowCancelModal(false)}
-                      className="w-full py-4 bg-deenly-green text-deenly-cream rounded-full font-bold shadow-xl hover:bg-deenly-green/90 transition-all"
-                    >
-                      Seguir con Premium
-                    </button>
-                    <button 
-                      onClick={() => { setIsPremium(false); setShowCancelModal(false); }}
-                      className="w-full py-2 text-xs font-bold uppercase tracking-widest text-red-500 font-bold hover:underline"
-                    >
-                      Confirmar cancelación
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Auth Modal */}
-      <AnimatePresence>
-        {showAuthModal && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-deenly-green/40 backdrop-blur-sm"
-            onClick={() => setShowAuthModal(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className={cn(
-                "p-8 rounded-[2.5rem] max-w-md w-full shadow-2xl border border-deenly-gold/20",
-                darkMode ? "bg-deenly-dark-surface text-deenly-dark-text" : "bg-white text-deenly-green"
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-deenly-green rounded-2xl flex items-center justify-center text-deenly-cream mx-auto mb-6 shadow-xl rotate-3">
-                  <Sparkles size={32} />
-                </div>
-                <h3 className="text-3xl font-serif font-bold">
-                  {isRegistering ? 'Crear cuenta' : 'Bienvenido a Deenly'}
-                </h3>
-                <p className="text-sm opacity-50 mt-2">
-                  {isRegistering 
-                    ? 'Únete a nuestra comunidad espiritual.' 
-                    : 'Tu guía islámica con inteligencia artificial.'}
-                </p>
-              </div>
-
-              {authMessage ? (
-                <div className={cn(
-                  "p-4 rounded-2xl mb-6 text-sm text-center",
-                  authMessage.type === 'success' ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-red-50 text-red-700 border border-red-100"
-                )}>
-                  <p className="font-bold mb-1">{authMessage.type === 'success' ? '¡Éxito!' : 'Atención'}</p>
-                  <p className="opacity-90 leading-relaxed">
-                    {authMessage.text === 'Invalid login credentials' 
-                      ? 'Email o contraseña incorrectos. Si no tienes cuenta, pulsa en "Soy nuevo" arriba.' 
-                      : authMessage.text}
-                  </p>
-                  {authMessage.type === 'success' && (
-                    <button 
-                      onClick={() => {
-                        setShowAuthModal(false);
-                        setAuthMessage(null);
-                      }}
-                      className="block w-full mt-4 py-2 bg-emerald-600 text-white rounded-full font-medium"
-                    >
-                      Entendido
-                    </button>
-                  )}
-                  {authMessage.type === 'error' && (
-                    <button 
-                      onClick={() => setAuthMessage(null)}
-                      className="block w-full mt-4 py-2 bg-red-600 text-white rounded-full font-medium"
-                    >
-                      Reintentar
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <form onSubmit={handleAuth} className="space-y-4">
-                  {isRegistering && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-bold text-deenly-green/40 mb-1 ml-2">Nombre</label>
-                        <input 
-                          type="text" 
-                          required
-                          value={authName}
-                          onChange={(e) => setAuthName(e.target.value)}
-                          placeholder="Tu nombre"
-                          className="w-full bg-white border border-deenly-gold/20 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-deenly-gold/30 text-deenly-green text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-bold text-deenly-green/40 mb-1 ml-2">Apellido</label>
-                        <input 
-                          type="text" 
-                          required
-                          value={authSurname}
-                          onChange={(e) => setAuthSurname(e.target.value)}
-                          placeholder="Tu apellido"
-                          className="w-full bg-white border border-deenly-gold/20 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-deenly-gold/30 text-deenly-green text-sm"
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <label className="block text-[10px] uppercase tracking-widest font-bold text-deenly-green/40 mb-1 ml-2">Edad</label>
-                        <input 
-                          type="number" 
-                          required
-                          min="1"
-                          max="120"
-                          value={authAge}
-                          onChange={(e) => setAuthAge(e.target.value)}
-                          placeholder="Tu edad"
-                          className="w-full bg-white border border-deenly-gold/20 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-deenly-gold/30 text-deenly-green text-sm"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-[10px] uppercase tracking-widest font-bold text-deenly-green/40 mb-1 ml-2">Email</label>
-                    <input 
-                      type="email" 
-                      required
-                      value={authEmail}
-                      onChange={(e) => setAuthEmail(e.target.value)}
-                      placeholder="tu@email.com"
-                      className="w-full bg-white border border-deenly-gold/20 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-deenly-gold/30 text-deenly-green text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] uppercase tracking-widest font-bold text-deenly-green/40 mb-1 ml-2">Contraseña</label>
-                    <input 
-                      type="password" 
-                      required
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full bg-white border border-deenly-gold/20 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-deenly-gold/30 text-deenly-green text-sm"
-                    />
-                  </div>
-
-                  <button 
-                    type="submit"
-                    disabled={authLoading}
-                    className="w-full py-3 bg-deenly-green text-deenly-cream rounded-full font-medium hover:bg-deenly-green/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {authLoading ? 'Procesando...' : (isRegistering ? 'Crear cuenta' : 'Entrar')}
-                    {!authLoading && <ChevronRight size={18} />}
-                  </button>
-
-                  <div className="flex flex-col gap-3 mt-4">
-                    <button
-                      type="button"
-                      onClick={() => setIsRegistering(!isRegistering)}
-                      className="text-xs text-deenly-green/60 hover:text-deenly-green transition-colors font-medium"
-                    >
-                      {isRegistering ? '¿Ya tienes cuenta? Iniciar sesión' : '¿No tienes cuenta? Crear cuenta'}
-                    </button>
-
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-px bg-deenly-gold/10" />
-                      <span className="text-[10px] text-deenly-green/20 font-bold uppercase tracking-widest">O</span>
-                      <div className="flex-1 h-px bg-deenly-gold/10" />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setUser({ id: 'guest', email: 'invitado@deenly.app', is_guest: true });
-                        setShowAuthModal(false);
-                      }}
-                      className="text-xs text-deenly-green/40 font-bold hover:text-deenly-green transition-colors"
-                    >
-                      Continuar como Invitado (Sin guardado)
-                    </button>
-                  </div>
-                </form>
-              )}
-              
-              <button 
-                onClick={() => setShowAuthModal(false)}
-                className="w-full mt-4 py-2 text-deenly-green/40 text-xs hover:text-deenly-green transition-colors"
-              >
-                Cancelar
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Reminders Modal */}
-      <AnimatePresence>
-        {showRemindersModal && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-deenly-green/40 backdrop-blur-sm"
-            onClick={() => setShowRemindersModal(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className={cn(
-                "p-8 rounded-3xl max-w-lg w-full shadow-2xl border border-deenly-gold/20",
-                darkMode ? "bg-deenly-dark-surface" : "bg-deenly-cream"
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-2xl font-serif text-deenly-green">Recordatorios Espirituales</h3>
-                <button onClick={() => setShowRemindersModal(false)} className="text-deenly-green/40 hover:text-deenly-green">
-                  <X size={24} />
-                </button>
-              </div>
-
-              <div className="space-y-4 mb-8">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-deenly-gold">Tarea / Recordatorio</label>
-                  <input 
-                    type="text" 
-                    value={newReminderText}
-                    onChange={(e) => setNewReminderText(e.target.value)}
-                    placeholder="Ej: Leer Surah Al-Kahf"
-                    className={cn(
-                      "w-full p-3 rounded-xl border border-deenly-gold/20 focus:outline-none focus:ring-2 focus:ring-deenly-gold/30",
-                      darkMode ? "bg-deenly-dark-bg text-deenly-dark-text" : "bg-white text-deenly-green"
-                    )}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-deenly-gold">Fecha</label>
-                    <input 
-                      type="date" 
-                      value={newReminderDate}
-                      onChange={(e) => setNewReminderDate(e.target.value)}
-                      className={cn(
-                        "w-full p-3 rounded-xl border border-deenly-gold/20 focus:outline-none focus:ring-2 focus:ring-deenly-gold/30",
-                        darkMode ? "bg-deenly-dark-bg text-deenly-dark-text" : "bg-white text-deenly-green"
-                      )}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-deenly-gold">Hora</label>
-                    <input 
-                      type="time" 
-                      value={newReminderTime}
-                      onChange={(e) => setNewReminderTime(e.target.value)}
-                      className={cn(
-                        "w-full p-3 rounded-xl border border-deenly-gold/20 focus:outline-none focus:ring-2 focus:ring-deenly-gold/30",
-                        darkMode ? "bg-deenly-dark-bg text-deenly-dark-text" : "bg-white text-deenly-green"
-                      )}
-                    />
-                  </div>
-                </div>
-                <button 
-                  onClick={addReminder}
-                  className="w-full py-3 bg-deenly-gold text-white rounded-xl font-bold text-sm shadow-lg hover:bg-deenly-gold/90 transition-all flex items-center justify-center gap-2"
-                >
-                  <Plus size={18} />
-                  Añadir Recordatorio
-                </button>
-              </div>
-
-              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide">
-                <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-deenly-gold mb-2">Tus Recordatorios</h4>
-                {reminders.length > 0 ? (
-                  reminders.map((reminder) => (
-                    <div 
-                      key={reminder.id}
-                      className={cn(
-                        "p-4 rounded-2xl border border-deenly-gold/10 flex items-center justify-between group",
-                        reminder.completed ? "opacity-50" : "opacity-100",
-                        darkMode ? "bg-deenly-dark-bg/50" : "bg-white"
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        <button 
-                          onClick={() => toggleReminder(reminder.id)}
-                          className={cn(
-                            "w-5 h-5 rounded-full border flex items-center justify-center transition-all",
-                            reminder.completed ? "bg-deenly-green border-deenly-green text-white" : "border-deenly-gold/30"
-                          )}
-                        >
-                          {reminder.completed && <Check size={12} />}
-                        </button>
-                        <div>
-                          <p className={cn("text-sm font-medium", reminder.completed && "line-through")}>{reminder.text}</p>
-                          <p className="text-[10px] opacity-40 flex items-center gap-1">
-                            <Clock size={10} />
-                            {new Date(reminder.dueDate).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                          </p>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => deleteReminder(reminder.id)}
-                        className="p-2 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 opacity-30">
-                    <Bell size={32} className="mx-auto mb-2" />
-                    <p className="text-xs">No tienes recordatorios activos</p>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Clear All Confirmation Modal */}
-      <AnimatePresence>
-        {showClearAllConfirm && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-deenly-green/40 backdrop-blur-sm"
-            onClick={() => setShowClearAllConfirm(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className={cn(
-                "p-8 rounded-3xl max-w-sm w-full shadow-2xl border border-deenly-gold/20 text-center",
-                darkMode ? "bg-deenly-dark-surface" : "bg-deenly-cream"
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500">
-                <Trash2 size={32} />
-              </div>
-              <h3 className={cn(
-                "text-xl font-bold mb-2",
-                darkMode ? "text-deenly-dark-text" : "text-deenly-green"
-              )}>¿Borrar todo el historial?</h3>
-              <p className={cn(
-                "text-sm mb-8 leading-relaxed",
-                darkMode ? "text-deenly-dark-text/60" : "text-deenly-green/60"
-              )}>
-                ¿Estás seguro de que quieres limpiar todo el historial de chat? Esta acción no se puede deshacer.
-              </p>
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setShowClearAllConfirm(false)}
-                  className={cn(
-                    "flex-1 py-3 rounded-xl font-bold text-sm transition-all",
-                    darkMode ? "bg-deenly-gold/10 text-deenly-gold hover:bg-deenly-gold/20" : "bg-deenly-gold/10 text-deenly-gold hover:bg-deenly-gold/20"
-                  )}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={clearMessages}
-                  className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-red-600 transition-all"
-                >
-                  Borrar todo
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Delete Confirmation Modal */}
-      <AnimatePresence>
-        {showDeleteConfirm && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-deenly-green/40 backdrop-blur-sm"
-            onClick={() => setShowDeleteConfirm(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className={cn(
-                "p-8 rounded-3xl max-w-sm w-full shadow-2xl border border-deenly-gold/20 text-center",
-                darkMode ? "bg-deenly-dark-surface" : "bg-deenly-cream"
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500">
-                <AlertTriangle size={32} />
-              </div>
-              <h3 className={cn(
-                "text-xl font-bold mb-2",
-                darkMode ? "text-deenly-dark-text" : "text-deenly-green"
-              )}>¿Eliminar chat?</h3>
-              <p className={cn(
-                "text-sm mb-8 leading-relaxed",
-                darkMode ? "text-deenly-dark-text/60" : "text-deenly-green/60"
-              )}>
-                ¿Seguro que quieres eliminar este chat? Esta acción no se puede deshacer.
-              </p>
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className={cn(
-                    "flex-1 py-3 rounded-xl font-bold text-sm transition-all",
-                    darkMode ? "bg-deenly-gold/10 text-deenly-gold hover:bg-deenly-gold/20" : "bg-deenly-gold/10 text-deenly-gold hover:bg-deenly-gold/20"
-                  )}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={confirmDeleteThread}
-                  className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-red-600 transition-all"
-                >
-                  Eliminar
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Hadith Library Modal */}
-      <AnimatePresence>
-        {showHadithLibrary && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-deenly-green/40 backdrop-blur-sm"
-            onClick={() => {
-              if (selectedHadith) setSelectedHadith(null);
-              else if (selectedCollection) setSelectedCollection(null);
-              else setShowHadithLibrary(false);
-            }}
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className={cn(
-                "w-full max-w-4xl h-[80vh] flex flex-col rounded-3xl shadow-2xl border border-deenly-gold/20 overflow-hidden",
-                darkMode ? "bg-deenly-dark-surface" : "bg-deenly-cream"
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal Header */}
-              <div className="p-6 border-b border-deenly-gold/10 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-deenly-gold/10 flex items-center justify-center text-deenly-gold">
-                    <MessageSquare size={20} />
-                  </div>
-                  <div>
-                    <h3 className={cn("text-xl font-bold", darkMode ? "text-deenly-dark-text" : "text-deenly-green")}>
-                      {selectedHadith ? "Detalle del Hadiz" : selectedCollection ? HADITH_COLLECTIONS.find(c => c.id === selectedCollection)?.name : "Biblioteca de Hadices"}
-                    </h3>
-                    <p className="text-[10px] uppercase tracking-widest font-bold opacity-40">Explora la Sunnah</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => {
-                    if (selectedHadith) setSelectedHadith(null);
-                    else if (selectedCollection) setSelectedCollection(null);
-                    else setShowHadithLibrary(false);
-                  }}
-                  className="p-2 hover:bg-deenly-gold/10 rounded-full transition-colors text-deenly-gold"
-                >
-                  <X size={24} />
-                </button>
-              </div>
-
-              {/* Modal Content */}
-              <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
-                {!selectedCollection ? (
-                  /* Collections Grid */
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {HADITH_COLLECTIONS.map((collection) => (
-                      <button
-                        key={collection.id}
-                        onClick={() => setSelectedCollection(collection.id)}
-                        className={cn(
-                          "p-6 rounded-2xl border border-deenly-gold/10 text-left transition-all hover:scale-[1.02] hover:shadow-lg group",
-                          darkMode ? "bg-deenly-dark-bg/50 hover:bg-deenly-dark-bg" : "bg-white hover:bg-deenly-gold/5"
-                        )}
-                      >
-                        <h4 className="text-lg font-bold text-deenly-green mb-1 group-hover:text-deenly-gold transition-colors">{collection.name}</h4>
-                        <p className="text-xs opacity-50 mb-4">{collection.hadiths.length} hadices disponibles</p>
-                        <div className="flex items-center text-deenly-gold text-[10px] font-bold uppercase tracking-widest">
-                          <span>Explorar colección</span>
-                          <ChevronRight size={14} />
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : !selectedHadith ? (
-                  /* Hadith List */
-                  <div className="space-y-4">
-                    <button 
-                      onClick={() => setSelectedCollection(null)}
-                      className="text-xs font-bold text-deenly-gold uppercase tracking-widest flex items-center gap-1 mb-4 hover:opacity-70 transition-opacity"
-                    >
-                      <Plus size={14} className="rotate-45" /> Volver a colecciones
-                    </button>
-                    <div className="grid grid-cols-1 gap-4">
-                      {HADITH_COLLECTIONS.find(c => c.id === selectedCollection)?.hadiths.map((hadith) => (
-                        <button
-                          key={hadith.id}
-                          onClick={() => setSelectedHadith(hadith)}
-                          className={cn(
-                            "p-5 rounded-2xl border border-deenly-gold/10 text-left transition-all hover:bg-deenly-gold/5",
-                            darkMode ? "bg-deenly-dark-bg/30" : "bg-white"
-                          )}
-                        >
-                          <div className="flex justify-between items-start mb-3">
-                            <span className="text-[10px] font-bold bg-deenly-gold/10 text-deenly-gold px-2 py-1 rounded-full uppercase tracking-tighter">
-                              Hadiz #{hadith.number}
-                            </span>
-                            <span className="text-[10px] opacity-40 font-medium italic">Narrado por {hadith.narrator}</span>
-                          </div>
-                          <p className="text-sm line-clamp-2 opacity-80 leading-relaxed mb-3">{hadith.text}</p>
-                          <p className="text-[10px] font-bold text-deenly-gold uppercase tracking-widest">Ver texto completo</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  /* Hadith Detail */
-                  <div className="max-w-2xl mx-auto py-8">
-                    <button 
-                      onClick={() => setSelectedHadith(null)}
-                      className="text-xs font-bold text-deenly-gold uppercase tracking-widest flex items-center gap-1 mb-8 hover:opacity-70 transition-opacity"
-                    >
-                      <Plus size={14} className="rotate-45" /> Volver a la lista
-                    </button>
-                    
-                    <div className="space-y-8">
-                      <div className="text-center space-y-2">
-                        <span className="text-xs font-bold text-deenly-gold uppercase tracking-[0.2em]">Referencia</span>
-                        <h4 className="text-2xl font-serif text-deenly-green">{selectedHadith.reference}</h4>
-                      </div>
-
-                      <div className={cn(
-                        "p-8 rounded-3xl border border-deenly-gold/10 shadow-inner relative",
-                        darkMode ? "bg-deenly-dark-bg/50" : "bg-white"
-                      )}>
-                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-deenly-gold text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                          Texto Completo
-                        </div>
-                        <p className="text-lg leading-relaxed text-deenly-green/90 font-serif italic text-center">
-                          "{selectedHadith.text}"
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 rounded-2xl bg-deenly-gold/5 border border-deenly-gold/10">
-                          <p className="text-[10px] uppercase tracking-widest font-bold opacity-40 mb-1">Narrador</p>
-                          <p className="text-sm font-bold text-deenly-green">{selectedHadith.narrator}</p>
-                        </div>
-                        <div className="p-4 rounded-2xl bg-deenly-gold/5 border border-deenly-gold/10">
-                          <p className="text-[10px] uppercase tracking-widest font-bold opacity-40 mb-1">Libro/Sección</p>
-                          <p className="text-sm font-bold text-deenly-green">{selectedHadith.book}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-center gap-4 pt-8">
-                        <button 
-                          onClick={() => {
-                            navigator.clipboard.writeText(`${selectedHadith.text}\n\n— ${selectedHadith.reference}`);
-                            alert('Hadiz copiado al portapapeles');
-                          }}
-                          className="flex items-center gap-2 px-6 py-3 rounded-full border border-deenly-gold/30 text-deenly-gold font-bold text-xs uppercase tracking-widest hover:bg-deenly-gold/5 transition-all"
-                        >
-                          <Share2 size={16} />
-                          Copiar
-                        </button>
-                        <button 
-                          onClick={() => {
-                            setShowHadithLibrary(false);
-                            setSelectedHadith(null);
-                            setSelectedCollection(null);
-                            setInput(`Explícame el significado del Hadiz: "${selectedHadith.text}"`);
-                            inputRef.current?.focus();
-                          }}
-                          className="flex items-center gap-2 px-6 py-3 rounded-full bg-deenly-green text-white font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-deenly-green/90 transition-all"
-                        >
-                          <Sparkles size={16} />
-                          Preguntar a Deenly
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Info Modal */}
-      <AnimatePresence>
-        {showInfo && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-deenly-green/40 backdrop-blur-sm"
-            onClick={() => setShowInfo(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-deenly-cream p-8 rounded-3xl max-w-md w-full shadow-2xl border border-deenly-gold/20"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-3xl font-serif text-deenly-green mb-4">Sobre Deenly</h3>
-              <div className="space-y-4 text-deenly-green/80 leading-relaxed">
-                <p>
-                  Deenly es tu compañero digital para explorar la sabiduría del Islam. 
-                  Utilizamos inteligencia artificial avanzada para proporcionar respuestas basadas en el Corán y la Sunnah.
-                </p>
-                <div className="p-4 bg-deenly-gold/10 rounded-2xl border border-deenly-gold/20">
-                  <p className="text-xs font-semibold text-deenly-gold uppercase tracking-wider mb-2">Aviso Importante</p>
-                  <p className="text-sm italic">
-                    Aunque Deenly se esfuerza por ser preciso, no es un sustituto de un erudito calificado. 
-                    Para asuntos legales complejos o decisiones de vida críticas, por favor consulta con tu imán local.
-                  </p>
-                </div>
-                <button 
-                  onClick={() => setShowInfo(false)}
-                  className="w-full py-3 bg-deenly-green text-deenly-cream rounded-full font-medium hover:bg-deenly-green/90 transition-all"
-                >
-                  Entendido
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-        {/* Main Chat Area */}
-        <div className={cn(
-          "flex-1 flex flex-col h-full transition-all duration-300 relative",
-          showSidebar ? "mr-0" : "mr-0"
-        )}>
-          {/* Header */}
-          <header className={cn(
-            "h-16 sm:h-20 px-4 sm:px-6 flex items-center justify-between border-b border-deenly-gold/10 z-30 transition-all sticky top-0 backdrop-blur-md",
-            darkMode ? "bg-deenly-dark-surface/90" : "bg-white/90"
-          )}>
-            <div className="flex items-center gap-2 sm:gap-4">
-              <button 
-                onClick={() => setShowSidebar(!showSidebar)}
-                className="p-2 hover:bg-deenly-gold/10 rounded-full transition-colors text-deenly-gold"
-                title="Menu"
-              >
-                <Plus size={20} className={cn("sm:w-6 sm:h-6 transition-transform duration-300", showSidebar && "rotate-45")} />
-              </button>
-              <div className="flex items-center gap-2 sm:gap-3">
-                <Logo size={40} showText />
-                {isPremium && (
-                  <span className="text-[8px] sm:text-[9px] bg-deenly-gold text-white px-1.5 sm:px-2 py-0.5 rounded-full font-sans uppercase tracking-widest font-bold">Premium</span>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {!isPremium && user && (
-                <button 
-                  onClick={() => setShowPremiumModal(true)}
-                  className="hidden sm:flex items-center gap-2 px-4 py-2 bg-deenly-gold text-white rounded-full text-xs font-bold uppercase tracking-widest shadow-md hover:bg-deenly-gold/90 transition-all"
-                >
-                  <Sparkles size={14} />
-                  Actualizar
-                </button>
-              )}
-
-              {user ? (
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={() => setShowProfileModal(true)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-deenly-gold/20 hover:bg-deenly-gold/5 transition-all"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-deenly-gold/20 flex items-center justify-center text-deenly-gold border border-deenly-gold/10">
-                      <User size={16} />
-                    </div>
-                    <div className="hidden md:flex flex-col items-start leading-none">
-                      <span className="text-xs font-bold text-deenly-green">
-                        {user.user_metadata?.name || 'Mi Perfil'}
-                      </span>
-                      <span className="text-[9px] opacity-40 uppercase tracking-tighter font-bold">
-                        {isPremium ? 'Premium' : 'Gratis'}
-                      </span>
-                    </div>
-                  </button>
-                </div>
-              ) : (
-                <button 
-                  onClick={() => setShowAuthModal(true)}
-                  className="px-5 py-2 rounded-full bg-deenly-green text-deenly-cream hover:bg-deenly-green/90 transition-all text-sm font-bold uppercase tracking-widest shadow-lg"
-                >
-                  Entrar
-                </button>
-              )}
-              
-              <button 
-                onClick={() => setDarkMode(!darkMode)}
-                className="p-2 text-deenly-green/40 hover:text-deenly-green transition-colors"
-                title={darkMode ? "Modo claro" : "Modo oscuro"}
-              >
-                {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-              </button>
-
-              {messages.length > 0 && (
-                <button 
-                  onClick={() => setShowClearAllConfirm(true)}
-                  className="p-2 text-red-400 hover:text-red-500 transition-colors"
-                  title="Limpiar historial"
-                >
-                  <Trash2 size={20} />
-                </button>
-              )}
-              
-              <button 
-                onClick={() => setShowInfo(true)}
-                className="p-2 text-deenly-green/40 hover:text-deenly-green transition-colors"
-              >
-                <Info size={20} />
-              </button>
-            </div>
-          </header>
-
-      {/* Main Content */}
-      <main className={cn(
-        "flex-1 overflow-y-auto scrollbar-hide relative islamic-pattern",
-        darkMode ? "bg-deenly-dark-bg" : "bg-deenly-cream"
-      )}>
-        {isHistoryLoading ? (
-          <div className="flex flex-col items-center justify-center h-full">
-            <PremiumSpinner />
-          </div>
-        ) : (
-          <div className="max-w-5xl mx-auto w-full px-6 py-12">
-            {!isPremium && user && (
-              <div className="flex justify-center mb-8">
-                <div className="px-4 py-1.5 rounded-full bg-white/80 backdrop-blur-sm border border-deenly-gold/20 shadow-sm flex items-center gap-3">
-                  <motion.div 
-                    animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="w-2 h-2 rounded-full bg-deenly-gold shadow-[0_0_8px_rgba(200,169,81,0.5)]" 
-                  />
-                  <span className="text-[10px] font-bold text-deenly-green/60 uppercase tracking-widest">
-                    Preguntas hoy: {questionsToday} / 30
-                  </span>
-                  <button 
-                    onClick={() => setShowPremiumModal(true)}
-                    className="text-[10px] font-bold text-deenly-gold hover:underline uppercase tracking-widest"
-                  >
-                    Ilimitado
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {filteredMessages.length === 0 ? (
-              <div className="space-y-8 sm:space-y-16 py-4 sm:py-8">
-                {/* Hero Section */}
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-center space-y-4 sm:space-y-6 max-w-3xl mx-auto"
-                >
-                  <h2 className="text-3xl sm:text-5xl md:text-6xl font-serif text-deenly-green leading-tight">
-                    Pregunta con confianza.<br />
-                    <span className="italic text-deenly-gold">Aprende con claridad.</span>
-                  </h2>
-                  <p className="text-sm sm:text-lg text-deenly-green/60 leading-relaxed max-w-2xl mx-auto px-4 sm:px-0">
-                    Consulta sobre el Corán, la Sunnah y Fiqh con inteligencia artificial diseñada para la Ummah.
-                  </p>
-                </motion.div>
-
-                {/* Main Input Box */}
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.2 }}
-                  className="max-w-2xl mx-auto relative group px-2 sm:px-0"
-                >
-                  <div className="absolute -inset-1 bg-deenly-gold/10 rounded-[1.5rem] sm:rounded-[2rem] blur-xl group-hover:bg-deenly-gold/20 transition-all duration-500" />
-                  <div className={cn(
-                    "relative p-1.5 sm:p-2 rounded-[1.5rem] sm:rounded-[2rem] border border-deenly-gold/20 shadow-2xl transition-all",
-                    darkMode ? "bg-deenly-dark-surface" : "bg-white"
-                  )}>
-                    <form 
-                      onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-                      className="flex items-center"
-                    >
-                      <input
-                        ref={inputRef as any}
-                        type="text"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder="Escribe tu pregunta..."
-                        className={cn(
-                          "flex-1 bg-transparent py-3 sm:py-5 px-4 sm:px-6 focus:outline-none text-base sm:text-lg placeholder:text-deenly-green/30",
-                          darkMode ? "text-deenly-dark-text" : "text-deenly-green"
-                        )}
-                      />
-                      <button
-                        type="submit"
-                        disabled={!input.trim() || isLoading}
-                        className="p-3 sm:p-4 bg-deenly-green text-deenly-white rounded-xl sm:rounded-2xl hover:bg-deenly-green/90 disabled:opacity-50 transition-all shadow-lg shadow-deenly-green/20 min-w-[48px] sm:min-w-[64px] flex items-center justify-center"
-                      >
-                        {isLoading ? (
-                          <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-deenly-white/20 border-t-deenly-white rounded-full animate-spin" />
-                        ) : (
-                          <Send size={20} className="sm:w-6 sm:h-6" strokeWidth={1.5} />
-                        )}
-                      </button>
-                    </form>
-                  </div>
-
-                  {!user && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.5 }}
-                      className="mt-4 sm:mt-6 p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-deenly-gold/5 border border-deenly-gold/10 text-center space-y-3 sm:space-y-4"
-                    >
-                      <p className="text-xs sm:text-sm text-deenly-green/70">
-                        Para guardar tus conversaciones y continuar, inicia sesión.
-                      </p>
-                      <button 
-                        onClick={() => {
-                          if (user) {
-                            inputRef.current?.focus();
-                          } else {
-                            setShowAuthModal(true);
-                          }
-                        }}
-                        className="px-6 sm:px-8 py-2.5 sm:py-3 bg-deenly-green text-deenly-white rounded-full font-bold uppercase tracking-widest text-[10px] sm:text-xs hover:bg-deenly-green/90 transition-all shadow-lg shadow-deenly-green/20"
-                      >
-                        Comenzar Gratis
-                      </button>
-                    </motion.div>
-                  )}
-
-                  {/* Suggested Questions Pills */}
-                  <div className="mt-6 flex flex-wrap justify-center gap-2">
-                    {SUGGESTED_QUESTIONS.map((q, i) => (
-                      <motion.button
-                        key={i}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 + (i * 0.05) }}
-                        onClick={() => {
-                          setInput(q);
-                          handleSend(q);
-                        }}
-                        className="px-4 py-2 rounded-full bg-white border border-deenly-gold/10 text-[10px] sm:text-xs text-deenly-green/60 hover:bg-deenly-gold/5 hover:text-deenly-green transition-all shadow-sm"
-                      >
-                        {q}
-                      </motion.button>
-                    ))}
-                  </div>
-                </motion.div>
-
-                {/* Common Questions Section */}
-                <div className="space-y-12 pt-8">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      <h3 className="text-2xl font-serif text-deenly-green">Explora Temas Comunes</h3>
-                      {isPremium && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className="px-2 py-0.5 rounded-full bg-deenly-gold/20 text-deenly-gold text-[8px] font-bold uppercase tracking-widest flex items-center gap-1"
-                        >
-                          <Sparkles size={10} />
-                          <span>Premium</span>
-                        </motion.div>
-                      )}
-                    </div>
-                    <p className="text-sm text-deenly-green/40 uppercase tracking-widest font-bold">Selecciona una categoría para ver preguntas frecuentes</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {COMMON_QUESTIONS.map((cat, i) => (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.4 + (i * 0.1) }}
-                        className={cn(
-                          "p-6 rounded-[2rem] border shadow-sm flex flex-col transition-all duration-500",
-                          isPremium 
-                            ? "border-deenly-gold/30 shadow-lg shadow-deenly-gold/5" 
-                            : "border-deenly-gold/10",
-                          darkMode ? "bg-deenly-dark-surface" : "bg-white"
-                        )}
-                      >
-                        <div className="flex items-center gap-4 mb-6">
-                          <div className={cn(
-                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-colors",
-                            isPremium ? "bg-deenly-gold/30 text-deenly-gold" : (darkMode ? "bg-deenly-gold/20 text-deenly-gold" : "bg-deenly-gold/10 text-deenly-gold")
-                          )}>
-                            <cat.icon size={24} strokeWidth={1.5} />
-                          </div>
-                          <h4 className="text-xl font-serif text-deenly-green">{cat.category}</h4>
-                        </div>
-                        
-                        <div className="space-y-2 flex-1">
-                          {cat.questions.map((q, j) => (
-                            <button
-                              key={j}
-                              onClick={() => {
-                                setInput(q);
-                                handleSend(q);
-                              }}
-                              className={cn(
-                                "w-full text-left p-3 rounded-xl text-xs transition-all border border-transparent hover:border-deenly-gold/20 hover:bg-deenly-gold/5",
-                                darkMode ? "text-deenly-dark-text/70 hover:text-deenly-dark-text" : "text-deenly-green/60 hover:text-deenly-green"
-                              )}
-                            >
-                              {q}
-                            </button>
-                          ))}
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-8 pb-32">
-                <AnimatePresence initial={false}>
-                  {filteredMessages.map((m) => (
-                    <motion.div
-                      key={m.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={cn(
-                        "flex w-full",
-                        m.role === 'user' ? "justify-end" : "justify-start"
-                      )}
-                    >
-                      <div className={cn(
-                        "max-w-[90%] sm:max-w-[85%] p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] shadow-sm",
-                        m.role === 'user' 
-                          ? "bg-deenly-green text-deenly-white rounded-tr-none" 
-                          : cn(
-                              "rounded-tl-none border border-deenly-gold/10",
-                              darkMode ? "bg-deenly-dark-surface text-deenly-dark-text" : "bg-white text-deenly-green"
-                            )
-                      )}>
-                        <div className="markdown-body text-sm sm:text-base">
-                          <Markdown>{m.content}</Markdown>
-                        </div>
-                        <div className={cn(
-                          "text-[10px] mt-3 opacity-40 font-bold uppercase tracking-widest flex items-center justify-between",
-                          m.role === 'user' ? "flex-row-reverse" : "flex-row"
-                        )}>
-                          <span>{m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                          {m.role === 'assistant' && (
-                            <button 
-                              onClick={() => handleShare(m.content, m.id)}
-                              className={cn(
-                                "flex items-center gap-1.5 px-3 py-1 rounded-full transition-all duration-300",
-                                "border border-deenly-gold/30 bg-deenly-gold/5 hover:bg-deenly-gold/20 hover:border-deenly-gold/60 hover:opacity-100",
-                                darkMode ? "text-deenly-gold" : "text-deenly-green"
-                              )}
-                              title="Compartir respuesta"
-                            >
-                              {copiedId === m.id ? (
-                                <>
-                                  <Check size={12} className="text-deenly-gold" />
-                                  <span className="text-[9px]">Copiado</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Share2 size={12} className="text-deenly-gold" />
-                                  <span className="text-[9px]">Compartir</span>
-                                </>
-                              )}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-                {isLoading && (
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex justify-start"
-                  >
-                    <div className="bg-white p-5 rounded-3xl border border-deenly-gold/10 flex items-center gap-2 shadow-sm">
-                      <div className="w-2 h-2 bg-deenly-gold rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <div className="w-2 h-2 bg-deenly-gold rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="w-2 h-2 bg-deenly-gold rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                  </motion.div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-          </div>
-        )}
-      </main>
-
-      {/* Footer sutil */}
-      <motion.footer 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1 }}
-        className={cn(
-          "p-8 border-t border-deenly-gold/10 transition-all text-center islamic-pattern",
-          darkMode ? "bg-deenly-dark-surface/80" : "bg-white/80",
-          "backdrop-blur-md"
-        )}
-      >
-        <p className="text-[10px] text-deenly-green/40 uppercase tracking-[0.2em] font-bold">
-          Deenly es una herramienta educativa basada en principios islámicos.
-        </p>
-      </motion.footer>
-    </div>
-
-      {/* Floating Input Area (only when chatting) */}
-      {filteredMessages.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 sm:p-6 z-40 pointer-events-none">
-          <div className="max-w-4xl mx-auto w-full pointer-events-auto">
-            <motion.div 
-              initial={{ y: 100 }}
-              animate={{ y: 0 }}
-              className={cn(
-                "p-1.5 sm:p-2 rounded-[1.5rem] sm:rounded-[2rem] border border-deenly-gold/20 shadow-2xl backdrop-blur-xl",
-                darkMode ? "bg-deenly-dark-surface/90" : "bg-white/90"
-              )}
-            >
-              <form 
-                onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-                className="flex items-center"
-              >
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Escribe tu pregunta..."
-                  className={cn(
-                    "flex-1 bg-transparent py-3 sm:py-4 px-4 sm:px-6 focus:outline-none text-sm sm:text-base placeholder:text-deenly-green/30",
-                    darkMode ? "text-deenly-dark-text" : "text-deenly-green"
-                  )}
-                />
-                <button
-                  type="submit"
-                  disabled={!input.trim() || isLoading}
-                  className="p-2.5 sm:p-3 bg-deenly-green text-deenly-white rounded-xl sm:rounded-2xl hover:bg-deenly-green/90 disabled:opacity-50 transition-all shadow-lg min-w-[40px] sm:min-w-[48px] flex items-center justify-center"
-                >
-                  {isLoading ? (
-                    <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-deenly-white/20 border-t-deenly-white rounded-full animate-spin" />
-                  ) : (
-                    <Send size={18} className="sm:w-5 sm:h-5" strokeWidth={1.5} />
-                  )}
-                </button>
-              </form>
-            </motion.div>
-          </div>
-        </div>
-      )}
-      <AnimatePresence>
-        {showSidebar && (
-          <>
-            {/* Mobile Overlay */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowSidebar(false)}
-              className="fixed inset-0 bg-deenly-green/20 backdrop-blur-sm z-40 lg:hidden"
-            />
-            <motion.aside
-              initial={{ x: 320, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 320, opacity: 0 }}
-              className={cn(
-                "fixed lg:relative inset-y-0 right-0 z-50 lg:z-0 w-[280px] sm:w-80 border-l border-deenly-gold/20 flex flex-col h-full transition-colors shadow-2xl lg:shadow-none",
-                darkMode ? "bg-deenly-dark-surface" : "bg-white"
-              )}
-            >
-              <div className="p-6 flex-1 flex flex-col overflow-hidden">
-                <div className="mb-10 flex justify-center">
-                  <Logo size={60} showText />
-                </div>
-                
-                <button 
-                  onClick={() => setActiveThreadId('new')}
-                  className="w-full py-3 px-6 rounded-2xl border border-deenly-gold/20 flex items-center justify-center gap-3 hover:bg-deenly-gold/5 transition-all mb-4 group"
-                >
-                  <Plus size={18} className="text-deenly-gold" />
-                  <span className="text-sm font-bold uppercase tracking-widest text-deenly-green">Nuevo Chat</span>
-                </button>
-
-                <div className="relative mb-6">
-                  <input 
-                    type="text" 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Buscar en los chats"
-                    className={cn(
-                      "w-full py-2.5 pl-10 pr-4 rounded-2xl text-xs border border-deenly-gold/10 focus:outline-none focus:ring-1 focus:ring-deenly-gold/30",
-                      darkMode ? "bg-deenly-dark-bg text-deenly-dark-text" : "bg-[#F7F5F2] text-deenly-green"
-                    )}
-                  />
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-deenly-gold/40">
-                    <History size={14} />
-                  </div>
-                </div>
-
-                <div className="space-y-1 mb-6">
-                  <button 
-                    onClick={() => {
-                      setInput("¿Qué dice el Corán sobre ");
-                      setShowSidebar(window.innerWidth < 1024 ? false : showSidebar);
-                      inputRef.current?.focus();
-                    }}
-                    className="w-full p-2 rounded-xl flex items-center gap-3 hover:bg-deenly-gold/5 transition-all text-sm text-deenly-green/70 hover:text-deenly-green"
-                  >
-                    <div className="text-deenly-gold/60"><BookOpen size={18} /></div>
-                    <span className="font-medium">Corán</span>
-                  </button>
-                  <button 
-                    onClick={() => setShowHadithLibrary(true)}
-                    className="w-full p-2 rounded-xl flex items-center gap-3 hover:bg-deenly-gold/5 transition-all text-sm text-deenly-green/70 hover:text-deenly-green"
-                  >
-                    <div className="text-deenly-gold/60"><MessageSquare size={18} /></div>
-                    <span className="font-medium">Hadices</span>
-                  </button>
-                  <button 
-                    onClick={() => setShowRemindersModal(true)}
-                    className="w-full p-2 rounded-xl flex items-center gap-3 hover:bg-deenly-gold/5 transition-all text-sm text-deenly-green/70 hover:text-deenly-green"
-                  >
-                    <div className="text-deenly-gold/60"><Bell size={18} /></div>
-                    <span className="font-medium">Recordatorios</span>
-                  </button>
-                  <button 
-                    onClick={() => setShowMemoryModal(true)}
-                    className="w-full p-2 rounded-xl flex items-center gap-3 hover:bg-deenly-gold/5 transition-all text-sm text-deenly-green/70 hover:text-deenly-green"
-                  >
-                    <div className="text-deenly-gold/60"><Brain size={18} /></div>
-                    <span className="font-medium">Memoria</span>
-                  </button>
-                  <button 
-                    onClick={() => setShowInfo(true)}
-                    className="w-full p-2 rounded-xl flex items-center gap-3 hover:bg-deenly-gold/5 transition-all text-sm text-deenly-green/70 hover:text-deenly-green"
-                  >
-                    <div className="text-deenly-gold/60"><Info size={18} /></div>
-                    <span className="font-medium">Ayuda</span>
-                  </button>
-                </div>
-
-            <div className="flex-1 overflow-y-auto scrollbar-hide">
-              <div className="px-2 mb-6">
-                <p className="text-[11px] leading-relaxed opacity-50 italic">
-                  Aquí encontrarás todas tus conversaciones anteriores. Deenly guarda tu historial para que puedas volver a cualquier chat cuando quieras. Nada se elimina automáticamente: tú decides qué conservar y qué borrar.
-                </p>
-              </div>
-              <div className="flex items-center justify-between mb-4 px-2">
-                <h4 className="text-[10px] uppercase tracking-widest font-bold text-deenly-gold/40">Tus chats</h4>
-                {chatThreads.length > 0 && (
-                  <button 
-                    onClick={() => setShowClearAllConfirm(true)}
-                    className="text-[10px] font-bold uppercase tracking-widest text-red-400 hover:text-red-500 transition-colors flex items-center gap-1"
-                  >
-                    <Trash2 size={10} />
-                    <span>Borrar</span>
-                  </button>
-                )}
-              </div>
-              <div className="space-y-2">
-                {isHistoryLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="p-3 space-y-2">
-                      <Skeleton className="h-4 w-3/4" />
-                      <div className="flex justify-between">
-                        <Skeleton className="h-3 w-1/4" />
-                        <Skeleton className="h-3 w-1/4" />
-                      </div>
-                    </div>
-                  ))
-                ) : chatThreads.length > 0 ? (
-                  chatThreads.map((thread) => (
-                    <div key={thread.id} className="group relative">
-                      <button 
-                        key={thread.id}
-                        onClick={() => setActiveThreadId(thread.id)}
-                        className={cn(
-                          "w-full p-3 pr-10 rounded-xl text-left transition-all border",
-                          activeThreadId === thread.id 
-                            ? "bg-deenly-gold/10 border-deenly-gold/30" 
-                            : "border-transparent hover:bg-deenly-gold/5"
-                        )}
-                      >
-                        <p className={cn(
-                          "text-sm truncate font-medium",
-                          activeThreadId === thread.id ? "text-deenly-green" : "opacity-70"
-                        )}>
-                          {thread.title}
-                        </p>
-                        <div className="flex items-center justify-between mt-1">
-                          <p className="text-[10px] opacity-40">
-                            {thread.date.toLocaleDateString([], { day: 'numeric', month: 'short' })}
-                          </p>
-                          <p className="text-[10px] opacity-40">{thread.messageCount} msgs</p>
-                        </div>
-                      </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleStarThread(thread.id);
-                        }}
-                        className={cn(
-                          "absolute right-10 top-1/2 -translate-y-1/2 p-2 transition-all rounded-lg",
-                          thread.isStarred 
-                            ? "text-deenly-gold opacity-100" 
-                            : "text-deenly-gold/40 opacity-0 group-hover:opacity-100 hover:bg-deenly-gold/5"
-                        )}
-                        title={thread.isStarred ? "Quitar de destacados" : "Marcar como destacado"}
-                      >
-                        <Star size={14} fill={thread.isStarred ? "currentColor" : "none"} />
-                      </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteThread(thread.id);
-                        }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 rounded-lg"
-                        title="Eliminar chat"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs text-center opacity-30 py-8">No hay chats recientes</p>
-                )}
-              </div>
-            </div>
+              <Menu size={24} />
+            </button>
+            <Logo showText size={28} variant={darkMode ? 'gold' : 'default'} className="sm:scale-110" />
           </div>
 
-          {/* Sidebar Footer */}
-          <div className="p-6 border-t border-deenly-gold/10">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <button 
+              onClick={() => setIsSearchModalOpen(true)}
+              className="flex items-center gap-2 p-2 sm:px-4 sm:py-2 bg-deenly-gold/10 text-deenly-gold rounded-full hover:bg-deenly-gold/20 transition-colors group"
+            >
+              <Search size={18} className="group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-bold uppercase tracking-widest hidden md:inline">{t.searchQuran}</span>
+            </button>
+            
             <button 
               onClick={() => setDarkMode(!darkMode)}
-              className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-deenly-gold/5 transition-all"
+              className="p-2 hover:bg-deenly-gold/10 rounded-full transition-colors text-deenly-gold"
             >
-              <div className="w-12 h-12 rounded-full bg-deenly-gold/5 flex items-center justify-center text-deenly-gold">
-                {darkMode ? <Sun size={24} /> : <Moon size={24} />}
-              </div>
-              <span className="text-base font-medium text-deenly-gold">Modo Oscuro</span>
+              {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+            
+            <button 
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="p-2 hover:bg-deenly-gold/10 rounded-full transition-colors text-deenly-gold relative"
+            >
+              <Bell size={20} />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-[#141414]"></span>
+            </button>
+
+            <button 
+              onClick={() => setIsProfileModalOpen(true)}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-deenly-gold/10 flex items-center justify-center text-deenly-gold border border-deenly-gold/20 hover:bg-deenly-gold/20 transition-colors"
+            >
+              <User size={18} />
             </button>
           </div>
-        </motion.aside>
-      </>
-    )}
-  </AnimatePresence>
-  </div>
-    </>
+        </div>
+      </header>
+
+      <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full relative overflow-hidden h-[calc(100vh-64px)]">
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide pb-4">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div className={`${
+                cardStyle === 'compact' ? 'max-w-[70%] sm:max-w-[60%]' : 'max-w-[90%] sm:max-w-[85%]'
+              } p-4 rounded-3xl shadow-sm ${
+                message.role === 'user' 
+                  ? 'bg-deenly-gold text-white rounded-tr-none' 
+                  : darkMode 
+                    ? 'bg-deenly-dark-surface border border-deenly-gold/10 rounded-tl-none' 
+                    : 'bg-white border border-deenly-gold/10 rounded-tl-none'
+              }`}>
+                <div className="flex items-center justify-between mb-2 opacity-60">
+                  <div className="flex items-center gap-2">
+                    {message.role === 'assistant' ? <Sparkles size={14} /> : <User size={14} />}
+                    <span className="text-[10px] font-bold uppercase tracking-widest">
+                      {message.role === 'assistant' ? 'Deenly' : t.you}
+                    </span>
+                  </div>
+                </div>
+                <div className="markdown-body">
+                  {editingMessageId === message.id ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className={`w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 focus:ring-deenly-gold/30 ${
+                          darkMode ? 'bg-deenly-dark-bg border-deenly-gold/20 text-white' : 'bg-white border-deenly-gold/10 text-deenly-green'
+                        }`}
+                        rows={3}
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={() => setEditingMessageId(null)}
+                          className="p-1.5 rounded-lg hover:bg-black/5 text-[10px] font-bold uppercase tracking-widest"
+                        >
+                          {t.cancel}
+                        </button>
+                        <button 
+                          onClick={() => saveEdit(message.id)}
+                          className="p-1.5 rounded-lg bg-deenly-gold text-white text-[10px] font-bold uppercase tracking-widest"
+                        >
+                          <Check size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <ReactMarkdown>{message.text}</ReactMarkdown>
+                  )}
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {message.role === 'user' && (
+                      <button 
+                        onClick={() => startEditing(message)}
+                        className={`p-1 rounded-md hover:bg-deenly-gold/10 ${message.role === 'user' ? 'text-white/60 hover:text-white' : 'text-deenly-gold/60 hover:text-deenly-gold'}`}
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => deleteMessage(message.id)}
+                      className={`p-1 rounded-md hover:bg-deenly-gold/10 ${message.role === 'user' ? 'text-white/60 hover:text-white' : 'text-deenly-gold/60 hover:text-deenly-gold'}`}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                  <div className="text-[8px] opacity-40 uppercase tracking-tighter">
+                      {new Date(message.timestamp).toLocaleDateString([], { day: '2-digit', month: '2-digit', year: 'numeric' })} {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className={`p-4 rounded-3xl rounded-tl-none ${darkMode ? 'bg-deenly-dark-surface' : 'bg-white'} border border-deenly-gold/10`}>
+                <div className="flex gap-1">
+                  {[0, 1, 2].map(i => (
+                    <div
+                      key={i}
+                      className="w-2 h-2 rounded-full bg-deenly-gold animate-pulse"
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input Area */}
+        <div className={`p-4 pb-6 sm:pb-8 ${darkMode ? 'bg-deenly-dark-bg' : 'bg-deenly-cream'} border-t border-deenly-gold/5`}>
+          <div className={`max-w-3xl mx-auto relative group transition-opacity ${isLoading ? 'opacity-50' : 'opacity-100'}`}>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder={t.placeholder}
+              className={`w-full py-4 pl-6 pr-14 rounded-3xl text-sm border border-deenly-gold/20 focus:outline-none focus:ring-2 focus:ring-deenly-gold/30 shadow-lg resize-none transition-colors ${
+                darkMode ? 'bg-deenly-dark-surface text-deenly-dark-text' : 'bg-white text-deenly-green'
+              }`}
+              rows={1}
+            />
+            <button
+              onClick={handleSend}
+              disabled={!input.trim() || isLoading}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-3 bg-deenly-gold text-white rounded-2xl hover:bg-deenly-gold/90 transition-colors disabled:opacity-30 shadow-md"
+            >
+              {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+            </button>
+          </div>
+          <p className="text-center text-[7px] sm:text-[8px] mt-3 opacity-30 uppercase tracking-[0.2em] font-medium">
+            {t.disclaimer}
+          </p>
+        </div>
+      </main>
+
+      {/* Sidebar Overlay */}
+      {isSidebarOpen && (
+        <>
+          <div 
+            onClick={() => setIsSidebarOpen(false)}
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+          />
+          <div 
+            className={`fixed top-0 left-0 bottom-0 z-50 w-72 shadow-2xl flex flex-col ${darkMode ? 'bg-deenly-dark-surface' : 'bg-deenly-cream'}`}
+          >
+            <div className="p-6 border-b border-deenly-gold/10 flex items-center justify-between">
+              <Logo showText size={28} variant={darkMode ? 'gold' : 'default'} />
+              <button onClick={() => setIsSidebarOpen(false)} className="text-deenly-gold">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              <button 
+                onClick={createNewChat}
+                className="w-full flex items-center gap-3 px-4 py-3 bg-deenly-gold text-white rounded-xl hover:bg-deenly-gold/90 transition-colors shadow-md mb-6"
+              >
+                <Plus size={18} />
+                <span className="text-xs font-bold uppercase tracking-widest">{t.newChat}</span>
+              </button>
+
+              <div className="text-[10px] font-bold text-deenly-gold uppercase tracking-widest mb-4 px-2">{t.history}</div>
+              
+              <div className="space-y-1 mb-8">
+                {sessions.map(s => (
+                  <div 
+                    key={s.id}
+                    onClick={() => switchChat(s.id)}
+                    className={`group flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-colors ${
+                      currentSessionId === s.id 
+                        ? 'bg-deenly-gold/20 text-deenly-gold' 
+                        : 'hover:bg-deenly-gold/5 opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <MessageSquare size={16} className="shrink-0" />
+                      <span className="text-xs font-medium truncate">{s.title}</span>
+                    </div>
+                    <button 
+                      onClick={(e) => deleteChat(e, s.id)}
+                      className="opacity-0 group-hover:opacity-50 hover:!opacity-100 p-1 hover:bg-deenly-gold/10 rounded-md transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+                {sessions.length === 0 && (
+                  <div className="px-4 py-8 text-center opacity-30">
+                    <History size={32} className="mx-auto mb-2" />
+                    <p className="text-[10px] uppercase tracking-widest">{t.noHistory}</p>
+                  </div>
+                )}
+              </div>
+
+                <div className="text-[10px] font-bold text-deenly-gold uppercase tracking-widest mb-4 px-2">{t.explore}</div>
+                
+                <div className="space-y-1">
+                  <button 
+                    onClick={() => {
+                      setIsSettingsModalOpen(true);
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-colors ${darkMode ? 'hover:bg-deenly-gold/10 text-deenly-dark-text' : 'hover:bg-deenly-gold/5 text-deenly-green'}`}
+                  >
+                    <Sparkles size={18} className="text-deenly-gold" />
+                    <span className="text-sm font-medium">{t.dailyInspiration}</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setIsSurahLibraryOpen(true);
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-colors ${darkMode ? 'hover:bg-deenly-gold/10 text-deenly-dark-text' : 'hover:bg-deenly-gold/5 text-deenly-green'}`}
+                  >
+                    <BookOpen size={18} className="text-deenly-gold" />
+                    <span className="text-sm font-medium">{t.surahLib}</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setIsSearchModalOpen(true);
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-colors ${darkMode ? 'hover:bg-deenly-gold/10 text-deenly-dark-text' : 'hover:bg-deenly-gold/5 text-deenly-green'}`}
+                  >
+                    <Search size={18} className="text-deenly-gold" />
+                    <span className="text-sm font-medium">{t.quranSearch}</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setIsIslamicCalendarOpen(true);
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-colors ${darkMode ? 'hover:bg-deenly-gold/10 text-deenly-dark-text' : 'hover:bg-deenly-gold/5 text-deenly-green'}`}
+                  >
+                    <Calendar size={18} className="text-deenly-gold" />
+                    <span className="text-sm font-medium">{t.islamicCalendar}</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setIsHadithModalOpen(true);
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-colors ${darkMode ? 'hover:bg-deenly-gold/10 text-deenly-dark-text' : 'hover:bg-deenly-gold/5 text-deenly-green'}`}
+                  >
+                    <Book size={18} className="text-deenly-gold" />
+                    <span className="text-sm font-medium">{t.hadith}</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setIsPrayerTimesModalOpen(true);
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-colors ${darkMode ? 'hover:bg-deenly-gold/10 text-deenly-dark-text' : 'hover:bg-deenly-gold/5 text-deenly-green'}`}
+                  >
+                    <Clock size={18} className="text-deenly-gold" />
+                    <span className="text-sm font-medium">{t.prayerTimes}</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      clearAllChats();
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-colors text-red-500 hover:bg-red-500/10`}
+                  >
+                    <Trash2 size={18} />
+                    <span className="text-sm font-medium">{t.clearHistory}</span>
+                  </button>
+                </div>
+
+                <div className="pt-6">
+                  <div className="text-[10px] font-bold text-deenly-gold uppercase tracking-widest mb-4 px-2">{t.premium}</div>
+                  <div className={`p-4 rounded-3xl border border-deenly-gold/20 relative overflow-hidden ${darkMode ? 'bg-deenly-gold/5' : 'bg-deenly-gold/5'}`}>
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Zap size={16} className="text-deenly-gold fill-deenly-gold" />
+                        <span className="text-xs font-bold uppercase tracking-wider text-deenly-gold">Deenly Pro</span>
+                      </div>
+                      <p className="text-[10px] opacity-60 mb-4">{t.proDesc}</p>
+                <button 
+                  onClick={() => {
+                    setIsPlansModalOpen(true);
+                    setIsSidebarOpen(false);
+                  }}
+                  className="w-full py-2 bg-deenly-gold text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-deenly-gold/90 transition-colors"
+                >
+                  {isPremium ? t.viewPlan : t.upgrade}
+                </button>
+                    </div>
+                    <div className="absolute -right-4 -bottom-4 opacity-10">
+                      <Logo size={80} variant="gold" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-deenly-gold/10 space-y-4">
+                <button 
+                  onClick={() => {
+                    setIsSettingsModalOpen(true);
+                    setIsSidebarOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 text-deenly-gold hover:opacity-80 transition-opacity"
+                >
+                  <Settings size={18} />
+                  <span className="text-sm font-medium">{t.settings}</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    setIsAboutModalOpen(true);
+                    setIsSidebarOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 text-deenly-gold hover:opacity-80 transition-opacity"
+                >
+                  <Info size={18} />
+                  <span className="text-sm font-medium">{t.about}</span>
+                </button>
+                <button 
+                  onClick={() => supabase.auth.signOut()}
+                  className="w-full flex items-center gap-3 text-red-500 hover:opacity-80 transition-opacity pt-4 border-t border-deenly-gold/10"
+                >
+                  <X size={18} />
+                  <span className="text-sm font-medium">{t.logout}</span>
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+      {/* Quran Search Modal */}
+      <QuranSearchModal 
+        isOpen={isSearchModalOpen} 
+        onClose={() => setIsSearchModalOpen(false)} 
+        darkMode={darkMode}
+        isPremium={isPremium}
+        session={session}
+      />
+
+      {/* Surah Library Modal */}
+      <SurahLibrary
+        isOpen={isSurahLibraryOpen}
+        onClose={() => setIsSurahLibraryOpen(false)}
+        darkMode={darkMode}
+        session={session}
+      />
+
+      {/* Profile Modal */}
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        session={session}
+        darkMode={darkMode}
+        isPremium={isPremium}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        darkMode={darkMode}
+        setDarkMode={setDarkMode}
+        isPremium={isPremium}
+        session={session}
+      />
+
+      {/* About Modal */}
+      <IslamicCalendarModal 
+        isOpen={isIslamicCalendarOpen} 
+        onClose={() => setIsIslamicCalendarOpen(false)} 
+        darkMode={darkMode} 
+      />
+
+      <HadithModal
+        isOpen={isHadithModalOpen}
+        onClose={() => setIsHadithModalOpen(false)}
+        darkMode={darkMode}
+      />
+
+      <PrayerTimesModal
+        isOpen={isPrayerTimesModalOpen}
+        onClose={() => setIsPrayerTimesModalOpen(false)}
+        darkMode={darkMode}
+        language={language}
+      />
+
+      <AboutModal
+        isOpen={isAboutModalOpen}
+        onClose={() => setIsAboutModalOpen(false)}
+        darkMode={darkMode}
+      />
+
+      {/* Toast Notifications */}
+      {toast && (
+        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300 ${
+          toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-deenly-gold text-deenly-ink'
+        }`}>
+          {toast.type === 'error' ? <Info size={18} /> : <Check size={18} />}
+          <p className="text-sm font-medium">{toast.message}</p>
+          <button onClick={() => setToast(null)} className="p-1 hover:bg-black/10 rounded-full transition-colors">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Plans Modal */}
+      <PlansModal
+        isOpen={isPlansModalOpen}
+        onClose={() => setIsPlansModalOpen(false)}
+        darkMode={darkMode}
+        isPremium={isPremium}
+        onUpgrade={handleUpgrade}
+      />
+    </div>
   );
 }
