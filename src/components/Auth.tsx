@@ -60,36 +60,48 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    console.log('Iniciando proceso de autenticación...', { isLogin, email });
 
     try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
+      // Timeout de 15 segundos para evitar que se quede cargando infinitamente
+      const authPromise = isLogin 
+        ? supabase.auth.signInWithPassword({ email, password })
+        : supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: { full_name: fullName },
             },
-          },
-        });
-        if (error) throw error;
-        
-        if (data.user) {
+          });
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('La conexión con el servidor ha tardado demasiado. Por favor, verifica tu conexión a internet y las credenciales de Supabase.')), 15000)
+      );
+
+      const { data, error }: any = await Promise.race([authPromise, timeoutPromise]);
+      
+      if (error) {
+        console.error('Error de Supabase:', error);
+        throw error;
+      }
+
+      console.log('Respuesta de Supabase recibida:', data);
+      
+      if (!isLogin) {
+        if (data?.user) {
+          console.log('Usuario creado, iniciando onboarding...');
           setShowOnboarding(true);
         } else {
+          console.log('Registro exitoso, esperando confirmación de email.');
           setSuccess('¡Registro exitoso! Por favor, revisa tu correo para confirmar tu cuenta.');
         }
       }
     } catch (err: any) {
-      setError(err.message || 'Ocurrió un error inesperado');
+      console.error('Error en handleAuth:', err);
+      setError(err.message || 'Ocurrió un error inesperado al conectar con Supabase');
     } finally {
       setLoading(false);
+      console.log('Proceso de autenticación finalizado.');
     }
   };
 
@@ -98,18 +110,42 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
       setOnboardingStep(prev => prev + 1);
     } else {
       setLoading(true);
+      setError(null);
       try {
-        const { error } = await supabase.auth.updateUser({
+        console.log('Finalizando onboarding...', onboardingData);
+        
+        // Intentar actualizar el usuario en Supabase
+        const { data: sessionData } = await supabase.auth.getSession();
+        
+        if (!sessionData.session) {
+          // Si no hay sesión, es probable que necesite confirmar email
+          throw new Error('Para finalizar, por favor confirma tu correo electrónico primero. Revisa tu bandeja de entrada (y SPAM).');
+        }
+
+        const { error: updateError } = await supabase.auth.updateUser({
           data: { 
             onboarding: onboardingData,
             is_onboarded: true
           }
         });
-        if (error) throw error;
-        setSuccess('¡Perfil completado! Ya puedes empezar tu viaje espiritual.');
-        setTimeout(() => window.location.reload(), 2000);
+
+        if (updateError) throw updateError;
+
+        setSuccess('¡Perfil completado! Redirigiendo...');
+        setTimeout(() => window.location.reload(), 1500);
       } catch (err: any) {
-        setError(err.message);
+        console.error('Error al finalizar onboarding:', err);
+        
+        // Fallback: Si es un error de sesión/permisos, guardamos localmente y permitimos continuar
+        if (err.message.includes('confirm') || err.status === 401) {
+          setError(err.message);
+        } else {
+          // Error genérico, intentamos forzar la entrada
+          setError('Hubo un pequeño problema al guardar en la nube, pero no te preocupes. Haz clic en Finalizar de nuevo para entrar.');
+          // Guardamos en localStorage como respaldo
+          localStorage.setItem('deenly_onboarding_fallback', JSON.stringify(onboardingData));
+          setTimeout(() => window.location.reload(), 3000);
+        }
       } finally {
         setLoading(false);
       }
@@ -175,6 +211,27 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
             })}
           </div>
 
+          {error && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex flex-col gap-2 p-4 rounded-2xl bg-red-500/20 border border-red-500/30 text-red-200 text-sm mt-4"
+            >
+              <div className="flex items-center gap-2">
+                <AlertCircle size={16} />
+                <span>{error}</span>
+              </div>
+              {error.includes('confirm') && (
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="text-xs font-bold underline hover:text-white text-left"
+                >
+                  ¿Ya lo has confirmado? Haz clic aquí para entrar.
+                </button>
+              )}
+            </motion.div>
+          )}
+
           <button
             onClick={handleOnboardingNext}
             disabled={loading || (!currentQ.multiple && !(onboardingData as any)[currentQ.id]) || (currentQ.multiple && onboardingData.interests.length === 0)}
@@ -183,6 +240,15 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
             {loading ? <Loader2 className="animate-spin" size={20} /> : (onboardingStep === onboardingQuestions.length - 1 ? 'Finalizar' : 'Siguiente')}
             <ArrowRight size={18} />
           </button>
+          
+          {onboardingStep === onboardingQuestions.length - 1 && error && (
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full mt-4 py-2 text-xs text-white/40 hover:text-white transition-colors"
+            >
+              Saltar y entrar de todos modos
+            </button>
+          )}
         </motion.div>
       </div>
     );
