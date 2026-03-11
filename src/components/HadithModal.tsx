@@ -6,9 +6,10 @@ interface HadithModalProps {
   isOpen: boolean;
   onClose: () => void;
   darkMode: boolean;
+  t: any;
 }
 
-export const HadithModal: React.FC<HadithModalProps> = ({ isOpen, onClose, darkMode }) => {
+export const HadithModal: React.FC<HadithModalProps> = ({ isOpen, onClose, darkMode, t }) => {
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,8 +51,8 @@ export const HadithModal: React.FC<HadithModalProps> = ({ isOpen, onClose, darkM
               <Book size={20} />
             </div>
             <div>
-              <h2 className="text-xl font-bold tracking-tight">Biblioteca de Hadices</h2>
-              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-deenly-gold/60">Sabiduría del Profeta (SAW)</p>
+              <h2 className="text-xl font-bold tracking-tight">{t.hadithLibrary || 'Biblioteca de Hadices'}</h2>
+              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-deenly-gold/60">{t.prophetWisdom || 'Sabiduría del Profeta (SAW)'}</p>
             </div>
           </div>
           <button 
@@ -70,7 +71,7 @@ export const HadithModal: React.FC<HadithModalProps> = ({ isOpen, onClose, darkM
           }`}>
             {/* Collections */}
             <div>
-              <h3 className="text-[10px] uppercase tracking-widest font-bold text-deenly-gold mb-3 px-2">Colecciones</h3>
+              <h3 className="text-[10px] uppercase tracking-widest font-bold text-deenly-gold mb-3 px-2">{t.collections || 'Colecciones'}</h3>
               <div className="space-y-1">
                 {collections.map(c => (
                   <button
@@ -95,7 +96,7 @@ export const HadithModal: React.FC<HadithModalProps> = ({ isOpen, onClose, darkM
             {/* Books */}
             {selectedCollection && (
               <div>
-                <h3 className="text-[10px] uppercase tracking-widest font-bold text-deenly-gold mb-3 px-2">Libros</h3>
+                <h3 className="text-[10px] uppercase tracking-widest font-bold text-deenly-gold mb-3 px-2">{t.books || 'Libros'}</h3>
                 <div className="space-y-1">
                   <button
                     onClick={() => setSelectedBook(null)}
@@ -105,7 +106,7 @@ export const HadithModal: React.FC<HadithModalProps> = ({ isOpen, onClose, darkM
                         : 'hover:bg-deenly-gold/5 opacity-70 hover:opacity-100'
                     }`}
                   >
-                    Todos los libros
+                    {t.allBooks || 'Todos los libros'}
                   </button>
                   {books.map(book => (
                     <button
@@ -136,7 +137,7 @@ export const HadithModal: React.FC<HadithModalProps> = ({ isOpen, onClose, darkM
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Buscar en esta colección..."
+                      placeholder={t.searchInCollection || "Buscar en esta colección..."}
                       className={`w-full pl-10 pr-4 py-2 rounded-xl text-sm border focus:outline-none focus:ring-2 focus:ring-deenly-gold/30 ${
                         darkMode ? 'bg-deenly-dark-bg border-deenly-gold/20 text-white' : 'bg-white border-deenly-gold/10 text-deenly-green'
                       }`}
@@ -155,13 +156,13 @@ export const HadithModal: React.FC<HadithModalProps> = ({ isOpen, onClose, darkM
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-2">
                             <Sparkles size={14} className="text-deenly-gold" />
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-deenly-gold">Hadiz {hadith.number}</span>
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-deenly-gold">{t.hadith || 'Hadiz'} {hadith.number}</span>
                           </div>
                           <span className="text-[10px] opacity-40 font-bold uppercase tracking-tighter">{hadith.reference}</span>
                         </div>
                         <p className="text-sm leading-relaxed italic mb-4">"{hadith.text}"</p>
                         <div className="flex items-center justify-between pt-4 border-t border-deenly-gold/5">
-                          <span className="text-[10px] font-bold text-deenly-gold uppercase tracking-widest">Narrado por: {hadith.narrator}</span>
+                          <span className="text-[10px] font-bold text-deenly-gold uppercase tracking-widest">{t.narratedBy || 'Narrado por'}: {hadith.narrator}</span>
                           <span className="text-[10px] opacity-40 uppercase font-bold">{hadith.book}</span>
                         </div>
                       </div>
@@ -169,7 +170,7 @@ export const HadithModal: React.FC<HadithModalProps> = ({ isOpen, onClose, darkM
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full opacity-30 text-center p-8">
                       <Book size={48} className="mb-4" />
-                      <p className="text-sm font-bold uppercase tracking-widest">No se encontraron hadices</p>
+                      <p className="text-sm font-bold uppercase tracking-widest">{t.noHadithsFound || 'No se encontraron hadices'}</p>
                     </div>
                   )}
                 </div>
@@ -177,8 +178,8 @@ export const HadithModal: React.FC<HadithModalProps> = ({ isOpen, onClose, darkM
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-12 text-center opacity-40">
                 <Book size={64} className="mb-6 text-deenly-gold" />
-                <h3 className="text-xl font-bold mb-2">Selecciona una colección</h3>
-                <p className="text-sm max-w-xs">Explora las enseñanzas del Profeta Muhammad (SAW) a través de las colecciones más auténticas.</p>
+                <h3 className="text-xl font-bold mb-2">{t.selectCollection || 'Selecciona una colección'}</h3>
+                <p className="text-sm max-w-xs">{t.exploreProphetTeachings || 'Explora las enseñanzas del Profeta Muhammad (SAW) a través de las colecciones más auténticas.'}</p>
               </div>
             )}
           </div>

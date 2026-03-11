@@ -48,7 +48,7 @@ export const searchQuranByKeyword = async (keyword: string, surah: string = 'all
 
 export const getAyah = async (surah: number, ayah: number, language: string = 'es.cortes'): Promise<any | null> => {
   try {
-    const response = await fetch(`${BASE_URL}/ayah/${surah}:${ayah}/editions/quran-uthmani,${language}`);
+    const response = await fetch(`${BASE_URL}/ayah/${surah}:${ayah}/editions/quran-uthmani,${language},ar.jalalayn`);
     const data = await response.json();
     if (data.code === 200) {
       // data.data is an array of editions
@@ -56,7 +56,8 @@ export const getAyah = async (surah: number, ayah: number, language: string = 'e
         ...data.data[0],
         arabicText: data.data[0].text,
         text: data.data[1].text,
-        translation: data.data[1].text
+        translation: data.data[1].text,
+        explanation: data.data[2].text
       };
     }
     return null;
@@ -116,13 +117,15 @@ export const getAyahOfTheDay = async (language: string = 'es.cortes'): Promise<a
     const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000);
     const ayahNumber = (dayOfYear * 13) % totalAyahs + 1;
 
-    const response = await fetch(`${BASE_URL}/ayah/${ayahNumber}/editions/quran-uthmani,${language}`);
+    // Fetch Arabic, Translation, and Jalalayn Tafsir
+    const response = await fetch(`${BASE_URL}/ayah/${ayahNumber}/editions/quran-uthmani,${language},ar.jalalayn`);
     const data = await response.json();
     if (data.code === 200) {
       return {
         ...data.data[0],
         arabicText: data.data[0].text,
         translation: data.data[1].text,
+        explanation: data.data[2].text,
         surah: data.data[0].surah,
         numberInSurah: data.data[0].numberInSurah
       };

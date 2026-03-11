@@ -6,9 +6,10 @@ interface AboutModalProps {
   isOpen: boolean;
   onClose: () => void;
   darkMode: boolean;
+  t: any;
 }
 
-export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, darkMode }) => {
+export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, darkMode, t }) => {
   if (!isOpen) return null;
 
   return (
@@ -25,7 +26,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, darkMod
       >
         <div className="p-6 border-b border-deenly-gold/10 flex items-center justify-between bg-deenly-gold/5">
           <h2 className={`text-xl font-bold ${darkMode ? 'text-deenly-dark-text' : 'text-deenly-green'}`}>
-            Sobre Deenly
+            {t.aboutTitle}
           </h2>
           <button 
             onClick={onClose}
@@ -45,19 +46,19 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, darkMod
           <div className="space-y-6">
             <div className="space-y-2">
               <h3 className={`text-sm font-bold uppercase tracking-widest text-deenly-gold flex items-center gap-2`}>
-                <Globe size={14} /> Nuestra Misión
+                <Globe size={14} /> {t.aboutMission}
               </h3>
               <p className={`text-sm leading-relaxed opacity-70 ${darkMode ? 'text-white' : 'text-deenly-green'}`}>
-                Deenly nace con el propósito de democratizar el acceso al conocimiento islámico auténtico mediante el uso de inteligencia artificial avanzada. Queremos ser un puente entre la tradición y la tecnología moderna.
+                {t.aboutMissionDesc}
               </p>
             </div>
 
             <div className="space-y-2">
               <h3 className={`text-sm font-bold uppercase tracking-widest text-deenly-gold flex items-center gap-2`}>
-                <ShieldCheck size={14} /> Compromiso con la Verdad
+                <ShieldCheck size={14} /> {t.aboutCommitment}
               </h3>
               <p className={`text-sm leading-relaxed opacity-70 ${darkMode ? 'text-white' : 'text-deenly-green'}`}>
-                Nuestras respuestas se basan en fuentes académicas reconocidas y el Sagrado Corán. Aunque la IA puede cometer errores, trabajamos continuamente para mejorar la precisión y fidelidad de la información proporcionada.
+                {t.aboutCommitmentDesc}
               </p>
             </div>
 
@@ -73,17 +74,17 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, darkMod
                 <div className="w-10 h-10 rounded-full bg-deenly-gold/10 flex items-center justify-center text-deenly-gold mx-auto mb-2">
                   <Heart size={20} />
                 </div>
-                <p className="text-[10px] font-bold uppercase tracking-widest opacity-40">Usuarios</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest opacity-40">{t.you === 'Tú' ? 'Usuarios' : (t.you === 'You' ? 'Users' : (t.you === 'Vous' ? 'Utilisateurs' : (t.you === 'أنت' ? 'المستخدمين' : (t.you === 'Anda' ? 'Pengguna' : 'Benutzer'))))}</p>
                 <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-deenly-green'}`}>+5k</p>
               </div>
             </div>
 
             <div className="pt-6 text-center">
               <p className="text-[10px] opacity-40 uppercase tracking-widest font-medium">
-                Hecho con ❤️ para la Ummah
+                {t.aboutUmmah}
               </p>
               <p className="text-[10px] text-deenly-gold font-bold mt-1">
-                © 2026 Deenly AI. Todos los derechos reservados.
+                {t.aboutRights}
               </p>
             </div>
           </div>

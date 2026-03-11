@@ -7,39 +7,27 @@ interface PlansModalProps {
   darkMode: boolean;
   isPremium: boolean;
   onUpgrade: () => void;
+  t: any;
 }
 
-export const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, darkMode, isPremium, onUpgrade }) => {
+export const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, darkMode, isPremium, onUpgrade, t }) => {
   const plans = [
     {
-      name: 'Gratis',
+      name: t.plansFree,
       price: '0€',
-      period: 'para siempre',
-      features: [
-        'Consultas básicas de IA',
-        'Buscador del Corán',
-        'Biblioteca de Suras',
-        'Historial de chats limitado',
-        'Respuestas estándar'
-      ],
-      buttonText: 'Plan Actual',
+      period: t.plansForever,
+      features: t.plansFeaturesFree,
+      buttonText: t.plansCurrent,
       disabled: true,
       popular: false,
       icon: <MessageSquare size={24} className="text-deenly-gold" />
     },
     {
-      name: 'Deenly Pro',
+      name: t.plansPro,
       price: '9.99€',
-      period: 'al mes',
-      features: [
-        'Consultas ilimitadas',
-        'Respuestas profundas y detalladas',
-        'Soporte prioritario 24/7',
-        'Historial de chats ilimitado',
-        'Acceso anticipado a nuevas funciones',
-        'Sin anuncios ni interrupciones'
-      ],
-      buttonText: isPremium ? 'Ya eres Pro' : 'Mejorar Ahora',
+      period: t.plansMonthly,
+      features: t.plansFeaturesPro,
+      buttonText: isPremium ? t.plansAlreadyPro : t.plansUpgrade,
       disabled: isPremium,
       popular: true,
       icon: <Zap size={24} className="text-deenly-gold fill-deenly-gold" />
@@ -67,10 +55,10 @@ export const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, darkMod
             </div>
             <div>
               <h2 className={`text-2xl font-bold ${darkMode ? 'text-deenly-dark-text' : 'text-deenly-green'}`}>
-                Planes de Deenly
+                {t.plansTitle}
               </h2>
               <p className="text-xs opacity-50 uppercase tracking-widest font-bold text-deenly-gold">
-                Elige el plan que mejor se adapte a tu búsqueda espiritual
+                {t.plansSubtitle}
               </p>
             </div>
           </div>
@@ -95,7 +83,7 @@ export const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, darkMod
               >
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-deenly-gold text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg">
-                    Más Popular
+                    {t.plansPopular}
                   </div>
                 )}
 
@@ -112,7 +100,7 @@ export const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, darkMod
                 <h3 className={`text-xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-deenly-green'}`}>{plan.name}</h3>
 
                 <div className="space-y-4 flex-1 mb-8">
-                  {plan.features.map((feature, j) => (
+                  {plan.features.map((feature: string, j: number) => (
                     <div key={j} className="flex items-start gap-3">
                       <div className="w-5 h-5 rounded-full bg-deenly-gold/10 flex items-center justify-center text-deenly-gold shrink-0 mt-0.5">
                         <Check size={12} strokeWidth={3} />
@@ -142,8 +130,8 @@ export const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, darkMod
               <ShieldCheck size={32} />
             </div>
             <div>
-              <h4 className={`text-lg font-bold mb-1 ${darkMode ? 'text-white' : 'text-deenly-green'}`}>Pago Seguro y Garantizado</h4>
-              <p className="text-sm opacity-60">Utilizamos Stripe para procesar todos los pagos de forma segura. Puedes cancelar tu suscripción en cualquier momento sin compromisos.</p>
+              <h4 className={`text-lg font-bold mb-1 ${darkMode ? 'text-white' : 'text-deenly-green'}`}>{t.plansSecure}</h4>
+              <p className="text-sm opacity-60">{t.plansSecureDesc}</p>
             </div>
           </div>
         </div>

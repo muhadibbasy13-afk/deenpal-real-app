@@ -16,13 +16,13 @@ interface Surah {
 }
 
 interface SurahDetail extends Surah {
-  meaning: string;
-  context: string;
-  keyThemes: string[];
-  historicalSignificance: string;
+  meaning?: string;
+  context?: string;
+  keyThemes?: string[];
+  historicalSignificance?: string;
 }
 
-const SURAHS: Surah[] = [
+const SURAHS_FALLBACK: Surah[] = [
   { number: 1, name: "Al-Fatihah", englishName: "Al-Fatihah", englishNameTranslation: "The Opening", numberOfAyahs: 7, revelationType: "Meccan" },
   { number: 2, name: "Al-Baqarah", englishName: "Al-Baqarah", englishNameTranslation: "The Cow", numberOfAyahs: 286, revelationType: "Medinan" },
   { number: 3, name: "Al-Imran", englishName: "Al-Imran", englishNameTranslation: "Family of Imran", numberOfAyahs: 200, revelationType: "Medinan" },
@@ -41,10 +41,12 @@ interface SurahLibraryProps {
   onClose: () => void;
   darkMode: boolean;
   session: Session | null;
+  language: string;
   showToast?: (message: string, type?: 'error' | 'success') => void;
 }
 
-export const SurahLibrary: React.FC<SurahLibraryProps> = ({ isOpen, onClose, darkMode, session, showToast }) => {
+export const SurahLibrary: React.FC<SurahLibraryProps> = ({ isOpen, onClose, darkMode, session, language, showToast }) => {
+  const [surahs, setSurahs] = useState<Surah[]>(SURAHS_FALLBACK);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSurah, setSelectedSurah] = useState<SurahDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,12 +55,31 @@ export const SurahLibrary: React.FC<SurahLibraryProps> = ({ isOpen, onClose, dar
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [playingAyah, setPlayingAyah] = useState<string | null>(null);
   const [isSurahPlaying, setIsSurahPlaying] = useState(false);
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
-  const nextAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const surahDetailsCache = useRef<Record<number, SurahDetail>>({});
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const nextAudioRef = useRef<HTMLAudioElement | null>(null);
+  const nextNextAudioRef = useRef<HTMLAudioElement | null>(null);
   const surahTimeoutRef = React.useRef<any>(null);
   const isSurahPlayingRef = React.useRef(false);
+  const currentSessionIdRef = React.useRef<number>(0);
+  const currentSurahNumberRef = React.useRef<number | null>(null);
 
   const quranReciter = session?.user?.user_metadata?.settings?.quranReciter || 'ar.alafasy';
+
+  useEffect(() => {
+    const fetchAllSurahs = async () => {
+      try {
+        const response = await fetch('https://api.alquran.cloud/v1/surah');
+        const data = await response.json();
+        if (data.code === 200) {
+          setSurahs(data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching all surahs:", error);
+      }
+    };
+    fetchAllSurahs();
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -69,8 +90,15 @@ export const SurahLibrary: React.FC<SurahLibraryProps> = ({ isOpen, onClose, dar
       }
       if (nextAudioRef.current) {
         nextAudioRef.current.pause();
-        nextAudioRef.current.src = '';
+        nextAudioRef.current.removeAttribute('src');
+        nextAudioRef.current.load();
         nextAudioRef.current = null;
+      }
+      if (nextNextAudioRef.current) {
+        nextNextAudioRef.current.pause();
+        nextNextAudioRef.current.removeAttribute('src');
+        nextNextAudioRef.current.load();
+        nextNextAudioRef.current = null;
       }
       if (surahTimeoutRef.current) {
         clearTimeout(surahTimeoutRef.current);
@@ -132,91 +160,68 @@ export const SurahLibrary: React.FC<SurahLibraryProps> = ({ isOpen, onClose, dar
     }
   };
 
-  const playAyahAudio = (surahNumber: number, ayahNumber: number) => {
-    const ayahId = `${surahNumber}:${ayahNumber}`;
+  const playAyahAudio = (ayah: any) => {
+    const ayahId = `${ayah.surah.number}:${ayah.numberInSurah}`;
     
     if (playingAyah === ayahId) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
-      }
-      setPlayingAyah(null);
-      isSurahPlayingRef.current = false;
-      setIsSurahPlaying(false);
-      if (surahTimeoutRef.current) {
-        clearTimeout(surahTimeoutRef.current);
-      }
+      stopPlayback();
       return;
     }
 
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-    }
-    
-    if (surahTimeoutRef.current) {
-      clearTimeout(surahTimeoutRef.current);
-    }
+    stopPlayback();
     
     isSurahPlayingRef.current = false;
     setIsSurahPlaying(false);
 
-    const audioUrl = `https://cdn.islamic.network/quran/audio/128/${quranReciter}/${surahNumber}_${ayahNumber}.mp3`;
-    const audio = new Audio(audioUrl);
+    const audioUrl = `https://cdn.islamic.network/quran/audio/128/${quranReciter}/${ayah.number}.mp3`;
+    console.log(`Playing single ayah ${ayah.number}:`, audioUrl);
+    
+    const audio = new Audio();
+    // Removed crossOrigin as it might cause issues with some CDNs if not configured correctly
+    
+    audio.onended = () => {
+      setPlayingAyah(null);
+    };
+
+    audio.onerror = () => {
+      const error = audio.error;
+      console.error(`Audio error for single ayah ${ayah.number}:`, error?.message || "Unknown error", "URL:", audioUrl);
+      setPlayingAyah(null);
+      if (showToast) showToast('Error al cargar el audio de la Aleya', 'error');
+    };
+
+    audio.src = audioUrl;
     audioRef.current = audio;
     setPlayingAyah(ayahId);
 
     audio.play().catch(err => {
-      console.error("Error playing audio:", err);
+      console.error(`Play promise failed for single ayah ${ayah.number}:`, err);
       setPlayingAyah(null);
     });
-
-    audio.onended = () => {
-      setPlayingAyah(null);
-    };
   };
 
   const playFullSurah = async (surahNumber: number) => {
-    if (isSurahPlayingRef.current) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
-      }
-      if (nextAudioRef.current) {
-        nextAudioRef.current.pause();
-        nextAudioRef.current.src = '';
-      }
-      if (surahTimeoutRef.current) {
-        clearTimeout(surahTimeoutRef.current);
-      }
-      isSurahPlayingRef.current = false;
-      setIsSurahPlaying(false);
-      setPlayingAyah(null);
-      
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.playbackState = 'paused';
-      }
+    // If clicking the same surah that is already playing, toggle it off
+    if (isSurahPlayingRef.current && currentSurahNumberRef.current === surahNumber) {
+      stopPlayback();
       return;
     }
 
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-    }
-    
-    if (surahTimeoutRef.current) {
-      clearTimeout(surahTimeoutRef.current);
-    }
+    // If something else is playing, stop it first
+    stopPlayback();
 
+    // Start new playback session
+    const sessionId = ++currentSessionIdRef.current;
     isSurahPlayingRef.current = true;
     setIsSurahPlaying(true);
+    currentSurahNumberRef.current = surahNumber;
     setPlayingAyah(null);
 
     try {
       const response = await fetch(`https://api.alquran.cloud/v1/surah/${surahNumber}/${quranReciter}`);
       const data = await response.json();
       
-      if (data.code === 200 && data.data.ayahs) {
+      if (data.code === 200 && data.data.ayahs && sessionId === currentSessionIdRef.current) {
         const ayahsData = data.data.ayahs;
         let index = 0;
         let retryCount = 0;
@@ -241,26 +246,30 @@ export const SurahLibrary: React.FC<SurahLibraryProps> = ({ isOpen, onClose, dar
             navigator.mediaSession.playbackState = 'paused';
           });
           navigator.mediaSession.setActionHandler('stop', () => {
-            playFullSurah(surahNumber);
+            stopPlayback();
           });
         }
 
         const playNext = () => {
-          if (!isSurahPlayingRef.current || index >= ayahsData.length) {
-            isSurahPlayingRef.current = false;
-            setIsSurahPlaying(false);
-            setPlayingAyah(null);
-            if (nextAudioRef.current) {
-              nextAudioRef.current.pause();
-              nextAudioRef.current.src = '';
-            }
-            if ('mediaSession' in navigator) {
-              navigator.mediaSession.playbackState = 'none';
+          // Check if this session is still active
+          if (!isSurahPlayingRef.current || sessionId !== currentSessionIdRef.current || index >= ayahsData.length) {
+            console.log(`Playback session ${sessionId} finished or inactive. Index: ${index}/${ayahsData.length}`);
+            if (sessionId === currentSessionIdRef.current) {
+              stopPlayback();
             }
             return;
           }
 
           const ayah = ayahsData[index];
+          console.log(`Playing ayah ${index + 1}/${ayahsData.length}: ${surahNumber}:${ayah.numberInSurah}`, ayah.audio);
+          
+          if (!ayah.audio) {
+            console.warn("No audio URL for ayah, skipping...", ayah);
+            index++;
+            surahTimeoutRef.current = setTimeout(playNext, 100);
+            return;
+          }
+
           setPlayingAyah(`${surahNumber}:${ayah.numberInSurah}`);
           
           if ('mediaSession' in navigator) {
@@ -275,85 +284,162 @@ export const SurahLibrary: React.FC<SurahLibraryProps> = ({ isOpen, onClose, dar
           }
 
           if (audioRef.current) {
+            audioRef.current.onended = null;
+            audioRef.current.onerror = null;
             audioRef.current.pause();
-            audioRef.current.src = '';
+            audioRef.current.removeAttribute('src');
+            audioRef.current.load();
           }
 
           let audio: HTMLAudioElement;
           if (nextAudioRef.current && nextAudioRef.current.src === ayah.audio) {
+            console.log("Using preloaded audio for ayah", ayah.numberInSurah);
             audio = nextAudioRef.current;
-            nextAudioRef.current = null;
+            nextAudioRef.current = nextNextAudioRef.current;
+            nextNextAudioRef.current = null;
+          } else if (nextNextAudioRef.current && nextNextAudioRef.current.src === ayah.audio) {
+            console.log("Using second preloaded audio for ayah", ayah.numberInSurah);
+            audio = nextNextAudioRef.current;
+            nextNextAudioRef.current = null;
           } else {
-            audio = new Audio(ayah.audio);
+            audio = new Audio();
+            audio.src = ayah.audio;
           }
           
           audioRef.current = audio;
           audio.preload = 'auto';
+          audio.currentTime = 0;
           
-          if (index + 1 < ayahsData.length) {
-            nextAudioRef.current = new Audio(ayahsData[index + 1].audio);
-            nextAudioRef.current.preload = 'auto';
-            nextAudioRef.current.load();
-          }
+          // Preload next ayahs (up to 2 ahead)
+          const preloadAyah = (targetIndex: number, ref: React.MutableRefObject<HTMLAudioElement | null>) => {
+            if (targetIndex < ayahsData.length) {
+              const targetAyah = ayahsData[targetIndex];
+              if (targetAyah.audio && (!ref.current || ref.current.src !== targetAyah.audio)) {
+                const nextAudio = new Audio();
+                nextAudio.src = targetAyah.audio;
+                nextAudio.preload = 'auto';
+                ref.current = nextAudio;
+                nextAudio.load();
+              }
+            }
+          };
+
+          preloadAyah(index + 1, nextAudioRef);
+          preloadAyah(index + 2, nextNextAudioRef);
           
+          audio.onended = () => {
+            if (isSurahPlayingRef.current && sessionId === currentSessionIdRef.current) {
+              console.log(`Ayah ${ayah.numberInSurah} ended, moving to next.`);
+              index++;
+              if (surahTimeoutRef.current) clearTimeout(surahTimeoutRef.current);
+              surahTimeoutRef.current = setTimeout(playNext, 50);
+            }
+          };
+
+          audio.onerror = () => {
+            const error = audio.error;
+            console.error(`Audio error for ayah ${ayah.numberInSurah}:`, error?.message || "Unknown error", "URL:", audio.src);
+            
+            if (isSurahPlayingRef.current && sessionId === currentSessionIdRef.current) {
+              if (retryCount < MAX_RETRIES) {
+                retryCount++;
+                console.log(`Retrying ayah ${ayah.numberInSurah} (${retryCount}/${MAX_RETRIES}) in 2s...`);
+                if (surahTimeoutRef.current) clearTimeout(surahTimeoutRef.current);
+                surahTimeoutRef.current = setTimeout(playNext, 2000);
+              } else {
+                console.error(`Max retries reached for ayah ${ayah.numberInSurah}, skipping to next.`);
+                retryCount = 0;
+                index++;
+                if (surahTimeoutRef.current) clearTimeout(surahTimeoutRef.current);
+                surahTimeoutRef.current = setTimeout(playNext, 1000);
+              }
+            }
+          };
+
           audio.play().then(() => {
             retryCount = 0;
             if ('mediaSession' in navigator) {
               navigator.mediaSession.playbackState = 'playing';
             }
           }).catch(err => {
-            console.error("Error playing surah audio:", err);
-            if (isSurahPlayingRef.current) {
+            console.error(`Play promise failed for ayah ${ayah.numberInSurah}:`, err);
+            if (isSurahPlayingRef.current && sessionId === currentSessionIdRef.current) {
               if (retryCount < MAX_RETRIES) {
                 retryCount++;
+                if (surahTimeoutRef.current) clearTimeout(surahTimeoutRef.current);
                 surahTimeoutRef.current = setTimeout(playNext, 2000);
               } else {
                 retryCount = 0;
                 index++;
+                if (surahTimeoutRef.current) clearTimeout(surahTimeoutRef.current);
                 surahTimeoutRef.current = setTimeout(playNext, 1000);
               }
             }
           });
-
-          audio.onended = () => {
-            index++;
-            if (isSurahPlayingRef.current) {
-              surahTimeoutRef.current = setTimeout(playNext, 600);
-            }
-          };
-
-          audio.onerror = () => {
-            console.error("Audio error event triggered");
-            if (isSurahPlayingRef.current) {
-              if (retryCount < MAX_RETRIES) {
-                retryCount++;
-                surahTimeoutRef.current = setTimeout(playNext, 2000);
-              } else {
-                retryCount = 0;
-                index++;
-                surahTimeoutRef.current = setTimeout(playNext, 1000);
-              }
-            }
-          };
         };
 
         playNext();
-      } else {
+      } else if (sessionId === currentSessionIdRef.current) {
         throw new Error("Invalid response from Quran API");
       }
     } catch (err) {
-      console.error("Error playing full surah audio:", err);
-      isSurahPlayingRef.current = false;
-      setIsSurahPlaying(false);
-      setPlayingAyah(null);
-      alert("No se pudo cargar el audio de la Sura completa. Por favor, intenta reproducir las Ayas individualmente.");
+      if (sessionId === currentSessionIdRef.current) {
+        console.error("Error playing full surah audio:", err);
+        stopPlayback();
+        alert("No se pudo cargar el audio de la Sura completa. Por favor, intenta reproducir las Ayas individualmente.");
+      }
+    }
+  };
+
+  const stopPlayback = () => {
+    if (audioRef.current) {
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
+      audioRef.current.pause();
+      audioRef.current.removeAttribute('src');
+      audioRef.current.load();
+      audioRef.current = null;
+    }
+    if (nextAudioRef.current) {
+      nextAudioRef.current.onended = null;
+      nextAudioRef.current.onerror = null;
+      nextAudioRef.current.pause();
+      nextAudioRef.current.removeAttribute('src');
+      nextAudioRef.current.load();
+      nextAudioRef.current = null;
+    }
+    if (nextNextAudioRef.current) {
+      nextNextAudioRef.current.onended = null;
+      nextNextAudioRef.current.onerror = null;
+      nextNextAudioRef.current.pause();
+      nextNextAudioRef.current.removeAttribute('src');
+      nextNextAudioRef.current.load();
+      nextNextAudioRef.current = null;
+    }
+    if (surahTimeoutRef.current) {
+      clearTimeout(surahTimeoutRef.current);
+      surahTimeoutRef.current = null;
+    }
+    isSurahPlayingRef.current = false;
+    setIsSurahPlaying(false);
+    setPlayingAyah(null);
+    currentSurahNumberRef.current = null;
+    
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'none';
     }
   };
 
   const fetchSurahContent = async (surahNum: number) => {
     setIsLoading(true);
     try {
-      const data = await getSurah(surahNum, 'es.cortes');
+      const edition = language === 'Español' ? 'es.cortes' : 
+                      language === 'English' ? 'en.sahih' : 
+                      language === 'Français' ? 'fr.hamidullah' : 
+                      language === 'Indonesia' ? 'id.indonesian' :
+                      language === 'Deutsch' ? 'de.aburida' :
+                      'ar.alafasy';
+      const data = await getSurah(surahNum, edition);
       if (data && data.ayahs) {
         setAyahs(data.ayahs);
         setViewMode('read');
@@ -365,19 +451,29 @@ export const SurahLibrary: React.FC<SurahLibraryProps> = ({ isOpen, onClose, dar
     }
   };
 
-  const filteredSurahs = SURAHS.filter(s => 
+  const filteredSurahs = surahs.filter(s => 
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     s.englishNameTranslation.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.number.toString() === searchQuery
   );
 
   const fetchSurahDetails = async (surah: Surah) => {
+    // Set basic info immediately for instant response
+    setSelectedSurah(surah);
+    
+    // Check cache first
+    if (surahDetailsCache.current[surah.number]) {
+      setSelectedSurah(surahDetailsCache.current[surah.number]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Proporciona detalles profundos sobre la Sura ${surah.number} (${surah.name}) del Corán en español. 
+        contents: `Proporciona detalles profundos sobre la Sura ${surah.number} (${surah.name}) del Corán en ${language}. 
         Incluye:
         1. Significado detallado del nombre.
         2. Contexto histórico de la revelación (Asbab al-Nuzul).
@@ -397,31 +493,43 @@ export const SurahLibrary: React.FC<SurahLibraryProps> = ({ isOpen, onClose, dar
       });
 
       const details = JSON.parse(response.text || '{}');
-      setSelectedSurah({
+      const surahWithDetails = {
         ...surah,
         ...details
+      };
+      
+      // Save to cache
+      surahDetailsCache.current[surah.number] = surahWithDetails;
+      
+      // Only update if this is still the selected surah
+      setSelectedSurah(prev => {
+        if (prev?.number === surah.number) {
+          return surahWithDetails;
+        }
+        return prev;
       });
     } catch (error) {
       console.error("Error fetching surah details:", error);
-      alert("No se pudieron cargar los detalles de la Sura. Por favor, inténtalo de nuevo.");
+      // We still have the basic info, so just show a toast
+      if (showToast) showToast("No se pudieron cargar los detalles adicionales", "error");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const currentIndex = selectedSurah ? SURAHS.findIndex(s => s.number === selectedSurah.number) : -1;
+  const currentIndex = selectedSurah ? surahs.findIndex(s => s.number === selectedSurah.number) : -1;
 
   const goToNextSurah = () => {
-    if (currentIndex < SURAHS.length - 1) {
+    if (currentIndex < surahs.length - 1) {
       setViewMode('info');
-      fetchSurahDetails(SURAHS[currentIndex + 1]);
+      fetchSurahDetails(surahs[currentIndex + 1]);
     }
   };
 
   const goToPrevSurah = () => {
     if (currentIndex > 0) {
       setViewMode('info');
-      fetchSurahDetails(SURAHS[currentIndex - 1]);
+      fetchSurahDetails(surahs[currentIndex - 1]);
     }
   };
 
@@ -522,18 +630,7 @@ export const SurahLibrary: React.FC<SurahLibraryProps> = ({ isOpen, onClose, dar
           {/* Surah Details */}
           <div className={`flex-1 overflow-y-auto p-4 sm:p-8 ${selectedSurah ? 'flex' : 'hidden md:flex'}`}>
             <AnimatePresence mode="wait">
-              {isLoading ? (
-                <motion.div 
-                  key="loader"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="w-full h-full flex flex-col items-center justify-center gap-4 opacity-50"
-                >
-                  <Loader2 className="animate-spin text-deenly-gold" size={40} />
-                  <p className="text-xs font-bold uppercase tracking-widest text-deenly-gold">Consultando...</p>
-                </motion.div>
-              ) : selectedSurah ? (
+              {selectedSurah ? (
                 <motion.div
                   key={selectedSurah.number}
                   initial={{ opacity: 0, x: 20 }}
@@ -597,64 +694,73 @@ export const SurahLibrary: React.FC<SurahLibraryProps> = ({ isOpen, onClose, dar
                     <ChevronLeft size={12} /> Anterior
                   </button>
                   <span>Desliza para cambiar</span>
-                  <button onClick={goToNextSurah} disabled={currentIndex === SURAHS.length - 1} className="disabled:opacity-20 flex items-center gap-1">
+                  <button onClick={goToNextSurah} disabled={currentIndex === surahs.length - 1} className="disabled:opacity-20 flex items-center gap-1">
                     Siguiente <ChevronRight size={12} />
                   </button>
                 </div>
 
                 {viewMode === 'info' ? (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                      <div className={`p-4 sm:p-6 rounded-[24px] sm:rounded-[32px] border border-deenly-gold/10 ${darkMode ? 'bg-deenly-dark-bg/50' : 'bg-white/50'}`}>
-                        <div className="flex items-center gap-2 mb-3 sm:mb-4 text-deenly-gold">
-                          <Info size={16} />
-                          <h3 className="text-[10px] sm:text-xs font-bold uppercase tracking-widest">Significado</h3>
-                        </div>
-                        <p className={`text-xs sm:text-sm leading-relaxed opacity-80 ${darkMode ? 'text-white' : 'text-deenly-green'}`}>
-                          {selectedSurah.meaning}
-                        </p>
-                      </div>
-
-                      <div className={`p-4 sm:p-6 rounded-[24px] sm:rounded-[32px] border border-deenly-gold/10 ${darkMode ? 'bg-deenly-dark-bg/50' : 'bg-white/50'}`}>
-                        <div className="flex items-center gap-2 mb-3 sm:mb-4 text-deenly-gold">
-                          <Book size={16} />
-                          <h3 className="text-[10px] sm:text-xs font-bold uppercase tracking-widest">Contexto</h3>
-                        </div>
-                        <p className={`text-xs sm:text-sm leading-relaxed opacity-80 ${darkMode ? 'text-white' : 'text-deenly-green'}`}>
-                          {selectedSurah.context}
-                        </p>
-                      </div>
+                  isLoading && !selectedSurah.meaning ? (
+                    <div className="w-full py-20 flex flex-col items-center justify-center gap-4 opacity-50">
+                      <Loader2 className="animate-spin text-deenly-gold" size={40} />
+                      <p className="text-xs font-bold uppercase tracking-widest text-deenly-gold">Consultando detalles...</p>
                     </div>
-
-                    <div className={`p-6 sm:p-8 rounded-[32px] sm:rounded-[40px] border border-deenly-gold/10 ${darkMode ? 'bg-deenly-gold/5' : 'bg-deenly-gold/5'}`}>
-                      <div className="flex items-center gap-2 mb-4 sm:mb-6 text-deenly-gold">
-                        <Sparkles size={18} />
-                        <h3 className="text-xs sm:text-sm font-bold uppercase tracking-widest">Temas Clave</h3>
-                      </div>
-                      <div className="flex flex-wrap gap-2 sm:gap-3">
-                        {selectedSurah.keyThemes.map((theme, i) => (
-                          <div 
-                            key={i}
-                            className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl text-[10px] sm:text-xs font-medium border border-deenly-gold/20 ${
-                              darkMode ? 'bg-deenly-dark-surface text-white' : 'bg-white text-deenly-green'
-                            }`}
-                          >
-                            {theme}
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                        <div className={`p-4 sm:p-6 rounded-[24px] sm:rounded-[32px] border border-deenly-gold/10 ${darkMode ? 'bg-deenly-dark-bg/50' : 'bg-white/50'}`}>
+                          <div className="flex items-center gap-2 mb-3 sm:mb-4 text-deenly-gold">
+                            <Info size={16} />
+                            <h3 className="text-[10px] sm:text-xs font-bold uppercase tracking-widest">Significado</h3>
                           </div>
-                        ))}
-                      </div>
-                    </div>
+                          <p className={`text-xs sm:text-sm leading-relaxed opacity-80 ${darkMode ? 'text-white' : 'text-deenly-green'}`}>
+                            {selectedSurah.meaning || 'Cargando...'}
+                          </p>
+                        </div>
 
-                    <div className={`p-6 sm:p-8 rounded-[32px] sm:rounded-[40px] border border-deenly-gold/10 ${darkMode ? 'bg-deenly-dark-bg/50' : 'bg-white/50'}`}>
-                      <div className="flex items-center gap-2 mb-3 sm:mb-4 text-deenly-gold">
-                        <Sparkles size={18} />
-                        <h3 className="text-xs sm:text-sm font-bold uppercase tracking-widest">Significado Espiritual</h3>
+                        <div className={`p-4 sm:p-6 rounded-[24px] sm:rounded-[32px] border border-deenly-gold/10 ${darkMode ? 'bg-deenly-dark-bg/50' : 'bg-white/50'}`}>
+                          <div className="flex items-center gap-2 mb-3 sm:mb-4 text-deenly-gold">
+                            <Book size={16} />
+                            <h3 className="text-[10px] sm:text-xs font-bold uppercase tracking-widest">Contexto</h3>
+                          </div>
+                          <p className={`text-xs sm:text-sm leading-relaxed opacity-80 ${darkMode ? 'text-white' : 'text-deenly-green'}`}>
+                            {selectedSurah.context || 'Cargando...'}
+                          </p>
+                        </div>
                       </div>
-                      <p className={`text-xs sm:text-sm leading-relaxed opacity-80 ${darkMode ? 'text-white' : 'text-deenly-green'}`}>
-                        {selectedSurah.historicalSignificance}
-                      </p>
-                    </div>
-                  </>
+
+                      <div className={`p-6 sm:p-8 rounded-[32px] sm:rounded-[40px] border border-deenly-gold/10 ${darkMode ? 'bg-deenly-gold/5' : 'bg-deenly-gold/5'}`}>
+                        <div className="flex items-center gap-2 mb-4 sm:mb-6 text-deenly-gold">
+                          <Sparkles size={18} />
+                          <h3 className="text-xs sm:text-sm font-bold uppercase tracking-widest">Temas Clave</h3>
+                        </div>
+                        <div className="flex flex-wrap gap-2 sm:gap-3">
+                          {selectedSurah.keyThemes ? selectedSurah.keyThemes.map((theme, i) => (
+                            <div 
+                              key={i}
+                              className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl text-[10px] sm:text-xs font-medium border border-deenly-gold/20 ${
+                                darkMode ? 'bg-deenly-dark-surface text-white' : 'bg-white text-deenly-green'
+                              }`}
+                            >
+                              {theme}
+                            </div>
+                          )) : (
+                            <p className="text-[10px] opacity-40">Cargando temas...</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className={`p-6 sm:p-8 rounded-[32px] sm:rounded-[40px] border border-deenly-gold/10 ${darkMode ? 'bg-deenly-dark-bg/50' : 'bg-white/50'}`}>
+                        <div className="flex items-center gap-2 mb-3 sm:mb-4 text-deenly-gold">
+                          <Sparkles size={18} />
+                          <h3 className="text-xs sm:text-sm font-bold uppercase tracking-widest">Significado Espiritual</h3>
+                        </div>
+                        <p className={`text-xs sm:text-sm leading-relaxed opacity-80 ${darkMode ? 'text-white' : 'text-deenly-green'}`}>
+                          {selectedSurah.historicalSignificance || 'Cargando...'}
+                        </p>
+                      </div>
+                    </>
+                  )
                 ) : (
                   <div className="space-y-6">
                     {ayahs.map((ayah) => (
@@ -680,7 +786,7 @@ export const SurahLibrary: React.FC<SurahLibraryProps> = ({ isOpen, onClose, dar
                               <Heart size={16} fill={isAyahFavorite(selectedSurah.number, ayah.numberInSurah) ? 'currentColor' : 'none'} />
                             </button>
                             <button 
-                              onClick={() => playAyahAudio(selectedSurah.number, ayah.numberInSurah)}
+                              onClick={() => playAyahAudio(ayah)}
                               className={`p-2 rounded-full transition-colors ${
                                 playingAyah === `${selectedSurah.number}:${ayah.numberInSurah}`
                                   ? 'bg-deenly-gold text-white'

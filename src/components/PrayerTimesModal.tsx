@@ -7,9 +7,10 @@ interface PrayerTimesModalProps {
   onClose: () => void;
   darkMode: boolean;
   language: string;
+  t: any;
 }
 
-export const PrayerTimesModal: React.FC<PrayerTimesModalProps> = ({ isOpen, onClose, darkMode, language }) => {
+export const PrayerTimesModal: React.FC<PrayerTimesModalProps> = ({ isOpen, onClose, darkMode, language, t }) => {
   const [location, setLocation] = useState({ city: 'Madrid', lat: 40.4168, lng: -3.7038 });
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
   const [nextPrayer, setNextPrayer] = useState<{ name: string; time: Date; countdown: string } | null>(null);
@@ -17,59 +18,6 @@ export const PrayerTimesModal: React.FC<PrayerTimesModalProps> = ({ isOpen, onCl
   const [isUpdating, setIsUpdating] = useState(false);
   const [locationInput, setLocationInput] = useState('');
   const [isEditingLocation, setIsEditingLocation] = useState(false);
-
-  const t: any = {
-    'Español': {
-      title: 'Horarios de Oración',
-      subtitle: 'Conexión espiritual diaria',
-      location: 'Ubicación',
-      todayTimes: 'Horarios de Hoy',
-      nextPrayer: 'Siguiente Oración',
-      fajr: 'Fajr',
-      dhuhr: 'Dhuhr',
-      asr: 'Asr',
-      maghrib: 'Maghrib',
-      isha: 'Isha',
-      autoLocation: 'Detectar automáticamente',
-      changeLocation: 'Cambiar ubicación',
-      confirm: 'Confirmar',
-      cancel: 'Cancelar',
-      loading: 'Cargando horarios...'
-    },
-    'English': {
-      title: 'Prayer Times',
-      subtitle: 'Daily spiritual connection',
-      location: 'Location',
-      todayTimes: 'Today\'s Times',
-      nextPrayer: 'Next Prayer',
-      fajr: 'Fajr',
-      dhuhr: 'Dhuhr',
-      asr: 'Asr',
-      maghrib: 'Maghrib',
-      isha: 'Isha',
-      autoLocation: 'Detect automatically',
-      changeLocation: 'Change location',
-      confirm: 'Confirm',
-      cancel: 'Cancel',
-      loading: 'Loading times...'
-    }
-  }[language] || {
-    title: 'Prayer Times',
-    subtitle: 'Daily spiritual connection',
-    location: 'Location',
-    todayTimes: 'Today\'s Times',
-    nextPrayer: 'Next Prayer',
-    fajr: 'Fajr',
-    dhuhr: 'Dhuhr',
-    asr: 'Asr',
-    maghrib: 'Maghrib',
-    isha: 'Isha',
-    autoLocation: 'Detect automatically',
-    changeLocation: 'Change location',
-    confirm: 'Confirm',
-    cancel: 'Cancel',
-    loading: 'Loading times...'
-  };
 
   useEffect(() => {
     if (isOpen) {
@@ -181,8 +129,8 @@ export const PrayerTimesModal: React.FC<PrayerTimesModalProps> = ({ isOpen, onCl
               <Clock size={20} />
             </div>
             <div>
-              <h2 className="text-xl font-bold tracking-tight">{t.title}</h2>
-              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-deenly-gold/60">{t.subtitle}</p>
+              <h2 className="text-xl font-bold tracking-tight">{t.prayerTitle || 'Horarios de Oración'}</h2>
+              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-deenly-gold/60">{t.prayerSubtitle || 'Conexión espiritual diaria'}</p>
             </div>
           </div>
           <button 
@@ -203,7 +151,7 @@ export const PrayerTimesModal: React.FC<PrayerTimesModalProps> = ({ isOpen, onCl
                   <MapPin size={20} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-deenly-gold uppercase tracking-widest">{t.location}</p>
+                  <p className="text-[10px] font-bold text-deenly-gold uppercase tracking-widest">{t.location || 'Ubicación'}</p>
                   <h4 className="text-sm font-bold">{location.city}</h4>
                 </div>
               </div>
@@ -262,7 +210,7 @@ export const PrayerTimesModal: React.FC<PrayerTimesModalProps> = ({ isOpen, onCl
                       darkMode ? 'border-deenly-gold/20 hover:bg-white/5' : 'border-deenly-gold/10 hover:bg-black/5'
                     }`}
                   >
-                    {t.changeLocation}
+                    {t.changeLocation || 'Cambiar ubicación'}
                   </button>
                 )}
               </div>
@@ -273,11 +221,11 @@ export const PrayerTimesModal: React.FC<PrayerTimesModalProps> = ({ isOpen, onCl
             <div className={`p-6 rounded-3xl border relative overflow-hidden ${darkMode ? 'bg-deenly-gold/10 border-deenly-gold/20' : 'bg-deenly-gold/5 border-deenly-gold/10'}`}>
               <div className="relative z-10 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-bold text-deenly-gold uppercase tracking-widest mb-1">{t.nextPrayer}</p>
+                  <p className="text-[10px] font-bold text-deenly-gold uppercase tracking-widest mb-1">{t.nextPrayer || 'Siguiente Oración'}</p>
                   <h3 className="text-2xl font-bold">{nextPrayer.name}</h3>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-bold text-deenly-gold uppercase tracking-widest mb-1">Comienza en</p>
+                  <p className="text-[10px] font-bold text-deenly-gold uppercase tracking-widest mb-1">{t.startsIn || 'Comienza en'}</p>
                   <p className="text-lg font-mono font-bold">{nextPrayer.countdown}</p>
                 </div>
               </div>

@@ -6,17 +6,26 @@ import { getAyahOfTheDay } from '../services/quranService';
 interface AyahOfTheDayProps {
   darkMode: boolean;
   language: string;
+  t: any;
 }
 
-const AyahOfTheDay: React.FC<AyahOfTheDayProps> = ({ darkMode, language }) => {
+const AyahOfTheDay: React.FC<AyahOfTheDayProps> = ({ darkMode, language, t }) => {
   const [ayah, setAyah] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
+  const [showExplanation, setShowExplanation] = useState(false);
+
   useEffect(() => {
     const fetchAyah = async () => {
       setLoading(true);
-      const data = await getAyahOfTheDay(language === 'Español' ? 'es.cortes' : language === 'English' ? 'en.sahih' : language === 'Français' ? 'fr.hamidullah' : 'ar.alafasy');
+      const edition = language === 'Español' ? 'es.cortes' : 
+                      language === 'English' ? 'en.sahih' : 
+                      language === 'Français' ? 'fr.hamidullah' : 
+                      language === 'Indonesia' ? 'id.indonesian' :
+                      language === 'Deutsch' ? 'de.aburida' :
+                      'ar.alafasy';
+      const data = await getAyahOfTheDay(edition);
       setAyah(data);
       setLoading(false);
     };
@@ -25,7 +34,7 @@ const AyahOfTheDay: React.FC<AyahOfTheDayProps> = ({ darkMode, language }) => {
 
   const handleCopy = () => {
     if (!ayah) return;
-    const textToCopy = `${ayah.arabicText}\n\n${ayah.translation}\n\n— Corán ${ayah.surah.number}:${ayah.numberInSurah} (${ayah.surah.englishName})`;
+    const textToCopy = `${ayah.arabicText}\n\n${ayah.translation}\n\n${ayah.explanation ? `Explicación: ${ayah.explanation}\n\n` : ''}— ${t.quran} ${ayah.surah.number}:${ayah.numberInSurah} (${ayah.surah.englishName})`;
     navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -33,10 +42,10 @@ const AyahOfTheDay: React.FC<AyahOfTheDayProps> = ({ darkMode, language }) => {
 
   const handleShare = () => {
     if (!ayah) return;
-    const textToShare = `📖 Ayah del Día en Deenly:\n\n"${ayah.translation}"\n\n— Corán ${ayah.surah.number}:${ayah.numberInSurah} (${ayah.surah.englishName})`;
+    const textToShare = `📖 ${t.ayahOfTheDay} en Deenly:\n\n"${ayah.translation}"\n\n— ${t.quran} ${ayah.surah.number}:${ayah.numberInSurah} (${ayah.surah.englishName})`;
     if (navigator.share) {
       navigator.share({
-        title: 'Ayah del Día - Deenly',
+        title: `${t.ayahOfTheDay} - Deenly`,
         text: textToShare,
         url: window.location.href,
       });
@@ -76,20 +85,20 @@ const AyahOfTheDay: React.FC<AyahOfTheDayProps> = ({ darkMode, language }) => {
             <div className="p-2 bg-deenly-gold/10 rounded-xl">
               <Sparkles size={18} />
             </div>
-            <h3 className="text-xs font-bold uppercase tracking-[0.2em]">Ayah del Día</h3>
+            <h3 className="text-xs font-bold uppercase tracking-[0.2em]">{t.ayahOfTheDay}</h3>
           </div>
           <div className="flex items-center gap-1">
             <button 
               onClick={handleCopy}
               className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-white/5 text-white/40 hover:text-white' : 'hover:bg-black/5 text-black/40 hover:text-black'}`}
-              title="Copiar"
+              title={t.copy}
             >
               {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
             </button>
             <button 
               onClick={handleShare}
               className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-white/5 text-white/40 hover:text-white' : 'hover:bg-black/5 text-black/40 hover:text-black'}`}
-              title="Compartir"
+              title={t.share}
             >
               <Share2 size={16} />
             </button>
@@ -110,9 +119,38 @@ const AyahOfTheDay: React.FC<AyahOfTheDayProps> = ({ darkMode, language }) => {
             </p>
           </div>
 
+          {ayah.explanation && (
+            <div className="space-y-3">
+              <button
+                onClick={() => setShowExplanation(!showExplanation)}
+                className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                  darkMode ? 'text-deenly-gold hover:text-white' : 'text-deenly-gold hover:text-deenly-green'
+                }`}
+              >
+                <BookOpen size={14} />
+                {showExplanation ? 'Ocultar Explicación' : 'Ver Explicación'}
+              </button>
+              
+              <AnimatePresence>
+                {showExplanation && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className={`text-xs sm:text-sm leading-relaxed p-4 rounded-2xl border border-deenly-gold/10 ${
+                      darkMode ? 'bg-white/5 text-white/70' : 'bg-black/5 text-deenly-green/70'
+                    }`}
+                  >
+                    {ayah.explanation}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
           <div className="flex items-center justify-between pt-4 border-t border-deenly-gold/5">
             <div className={`text-[10px] font-bold uppercase tracking-widest ${darkMode ? 'text-deenly-gold/60' : 'text-deenly-gold'}`}>
-              Sura {ayah.surah.name} • {ayah.surah.number}:{ayah.numberInSurah}
+              {t.surah} {ayah.surah.name} • {ayah.surah.number}:{ayah.numberInSurah}
             </div>
             <div className={`text-[10px] font-medium opacity-40 uppercase tracking-widest ${darkMode ? 'text-white' : 'text-deenly-green'}`}>
               {ayah.surah.englishName}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { Mail, Lock, User, ArrowRight, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface AuthProps {
@@ -8,6 +8,7 @@ interface AuthProps {
 }
 
 export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
+  const [language, setLanguage] = useState('Español');
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,27 +26,242 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
     goal: ''
   });
 
+  const translations: any = {
+    'English': {
+      loginTitle: 'Welcome to Deenly',
+      signupTitle: 'Create your account',
+      loginSubtitle: 'Access your personalized spiritual space',
+      signupSubtitle: 'Join our learning community',
+      emailLabel: 'Email Address',
+      passwordLabel: 'Password',
+      nameLabel: 'Full Name',
+      forgotPass: 'Forgot your password?',
+      loginBtn: 'Log In',
+      signupBtn: 'Sign Up',
+      createAcc: 'Create new account',
+      haveAcc: 'Already have an account? Log In',
+      terms: 'By continuing, you agree to our Terms and Privacy Policy',
+      onboardingStep: 'Step',
+      finish: 'Finish',
+      next: 'Next',
+      q1: 'How do you prefer I address you?',
+      q1Options: ['Brother', 'Sister'],
+      q2: 'What is your level of knowledge about Islam?',
+      q2Options: ['Beginner', 'Intermediate', 'Advanced'],
+      q3: 'What topics interest you most?',
+      q3Options: ['History', 'Fiqh', 'Spirituality', 'Quran', 'Hadith'],
+      q4: 'What is your main goal with Deenly?',
+      q4Options: ['Learn', 'Resolve doubts', 'Daily connection'],
+      confirmEmail: 'Your account has been successfully created! To start your Deenly experience, please verify your email through the link we\'ve sent you.',
+      confirmEmailTitle: 'Almost there!',
+      confirmEmailBtn: 'Go to Login',
+      errorSupabase: 'Supabase is not configured. Please add the environment variables.',
+      errorTimeout: 'The connection is taking longer than expected. Please check your internet and try again.',
+      errorRateLimit: 'You have tried to register too many times. Please wait a few minutes.',
+      errorUnexpected: 'An unexpected error occurred connecting to Supabase',
+      errorOnboarding: 'There was a small problem saving to the cloud, but don\'t worry. Click Finish again to enter.',
+      skipOnboarding: 'Skip and enter anyway'
+    },
+    'Español': {
+      loginTitle: 'Bienvenido a Deenly',
+      signupTitle: 'Crea tu cuenta',
+      loginSubtitle: 'Accede a tu espacio espiritual personalizado',
+      signupSubtitle: 'Únete a nuestra comunidad de aprendizaje',
+      emailLabel: 'Correo electrónico',
+      passwordLabel: 'Contraseña',
+      nameLabel: 'Nombre completo',
+      forgotPass: '¿Olvidaste tu contraseña?',
+      loginBtn: 'Iniciar sesión',
+      signupBtn: 'Registrarse',
+      createAcc: 'Crear cuenta nueva',
+      haveAcc: '¿Ya tienes cuenta? Inicia sesión',
+      terms: 'Al continuar, aceptas nuestros Términos y Política de Privacidad',
+      onboardingStep: 'Paso',
+      finish: 'Finalizar',
+      next: 'Siguiente',
+      q1: '¿Cómo prefieres que me dirija a ti?',
+      q1Options: ['Hermano', 'Hermana'],
+      q2: '¿Cuál es tu nivel de conocimiento sobre el Islam?',
+      q2Options: ['Principiante', 'Intermedio', 'Avanzado'],
+      q3: '¿Qué temas te interesan más?',
+      q3Options: ['Historia', 'Fiqh', 'Espiritualidad', 'Corán', 'Hadiz'],
+      q4: '¿Cuál es tu objetivo principal con Deenly?',
+      q4Options: ['Aprender', 'Resolver dudas', 'Conexión diaria'],
+      confirmEmail: '¡Tu cuenta ha sido creada con éxito! Para comenzar tu experiencia en Deenly, por favor verifica tu correo electrónico a través del enlace que te hemos enviado.',
+      confirmEmailTitle: '¡Casi has llegado!',
+      confirmEmailBtn: 'Ir al Inicio de Sesión',
+      errorSupabase: 'Supabase no está configurado. Por favor, añade las variables de entorno.',
+      errorTimeout: 'La conexión está tardando más de lo esperado. Por favor, verifica tu internet e inténtalo de nuevo.',
+      errorRateLimit: 'Has intentado registrarte demasiadas veces. Por favor, espera unos minutos.',
+      errorUnexpected: 'Ocurrió un error inesperado al conectar con Supabase',
+      errorOnboarding: 'Hubo un pequeño problema al guardar en la nube, pero no te preocupes. Haz clic en Finalizar de nuevo para entrar.',
+      skipOnboarding: 'Saltar y entrar de todos modos'
+    },
+    'Français': {
+      loginTitle: 'Bienvenue sur Deenly',
+      signupTitle: 'Créez votre compte',
+      loginSubtitle: 'Accédez à votre espace spirituel personnalisé',
+      signupSubtitle: 'Rejoignez notre communauté d\'apprentissage',
+      emailLabel: 'Adresse e-mail',
+      passwordLabel: 'Mot de passe',
+      nameLabel: 'Nom complet',
+      forgotPass: 'Mot de passe oublié ?',
+      loginBtn: 'Se connecter',
+      signupBtn: 'S\'inscrire',
+      createAcc: 'Créer un nouveau compte',
+      haveAcc: 'Vous avez déjà un compte ? Se connecter',
+      terms: 'En continuant, vous acceptez nos Conditions et notre Politique de Confidentialité',
+      onboardingStep: 'Étape',
+      finish: 'Terminer',
+      next: 'Suivant',
+      q1: 'Comment préférez-vous que je m\'adresse à vous ?',
+      q1Options: ['Frère', 'Sœur'],
+      q2: 'Quel est votre niveau de connaissance de l\'Islam ?',
+      q2Options: ['Débutant', 'Intermédiaire', 'Avancé'],
+      q3: 'Quels sujets vous intéressent le plus ?',
+      q3Options: ['Histoire', 'Fiqh', 'Spiritualité', 'Coran', 'Hadith'],
+      q4: 'Quel est votre objectif principal avec Deenly ?',
+      q4Options: ['Apprendre', 'Résoudre des doutes', 'Connexion quotidienne'],
+      confirmEmail: 'Votre compte a été créé avec succès ! Pour commencer votre expérience Deenly, veuillez vérifier votre e-mail via le lien que nous vous avons envoyé.',
+      confirmEmailTitle: 'Presque là !',
+      confirmEmailBtn: 'Aller à la connexion',
+      errorSupabase: 'Supabase n\'est pas configuré. Veuillez ajouter les variables d\'environnement.',
+      errorTimeout: 'La connexion prend plus de temps que prévu. Veuillez vérifier votre connexion internet et réessayer.',
+      errorRateLimit: 'Vous avez essayé de vous inscrire trop de fois. Veuillez patienter quelques minutes.',
+      errorUnexpected: 'Une erreur inattendue s\'est produite lors de la connexion à Supabase',
+      errorOnboarding: 'Il y a eu un petit problème lors de l\'enregistrement dans le cloud, mais ne vous inquiétez pas. Cliquez à nouveau sur Terminer untuk entrer.',
+      skipOnboarding: 'Passer et entrer quand même'
+    },
+    'العربية': {
+      loginTitle: 'مرحباً بك في Deenly',
+      signupTitle: 'أنشئ حسابك',
+      loginSubtitle: 'الوصول إلى مساحتك الروحية المخصصة',
+      signupSubtitle: 'انضم إلى مجتمع التعلم لدينا',
+      emailLabel: 'البريد الإلكتروني',
+      passwordLabel: 'كلمة المرور',
+      nameLabel: 'الاسم الكامل',
+      forgotPass: 'هل نسيت كلمة المرور؟',
+      loginBtn: 'تسجيل الدخول',
+      signupBtn: 'إنشاء حساب',
+      createAcc: 'إنشاء حساب جديد',
+      haveAcc: 'لديك حساب بالفعل؟ تسجيل الدخول',
+      terms: 'بالاستمرار، فإنك توافق على الشروط وسياسة الخصوصية الخاصة بنا',
+      onboardingStep: 'خطوة',
+      finish: 'إنهاء',
+      next: 'التالي',
+      q1: 'كيف تفضل أن أخاطبك؟',
+      q1Options: ['أخ', 'أخت'],
+      q2: 'ما هو مستوى معرفتك بالإسلام؟',
+      q2Options: ['مبتدئ', 'متوسط', 'متقدم'],
+      q3: 'ما هي المواضيع التي تهمك أكثر؟',
+      q3Options: ['التاريخ', 'الفقه', 'الروحانيات', 'القرآن', 'الحديث'],
+      q4: 'ما هو هدفك الرئيسي من Deenly؟',
+      q4Options: ['التعلم', 'حل الشكوك', 'الاتصال اليومي'],
+      confirmEmail: 'لقد تم إنشاء حسابك بنجاح! لبدء تجربتك في Deenly، يرجى تفعيل حسابك عبر الرابط الذي أرسلناه إلى بريدك الإلكتروني.',
+      confirmEmailTitle: 'لقد اقتربت من الوصول!',
+      confirmEmailBtn: 'الذهاب لتسجيل الدخول',
+      errorSupabase: 'لم يتم تكوين Supabase. يرجى إضافة متغيرات البيئة.',
+      errorTimeout: 'الاتصال يستغرق وقتاً أطول من المتوقع. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.',
+      errorRateLimit: 'لقد حاولت التسجيل مرات عديدة. يرجى الانتظار بضع دقائق.',
+      errorUnexpected: 'حدث خطأ غير متوقع أثناء الاتصال بـ Supabase',
+      errorOnboarding: 'حدثت مشكلة صغيرة أثناء الحفظ في السحابة، لكن لا تقلق. انقر فوق إنهاء مرة أخرى للدخول.',
+      skipOnboarding: 'تخطي والدخول على أي حال'
+    },
+    'Indonesian': {
+      loginTitle: 'Selamat Datang di Deenly',
+      signupTitle: 'Buat akun Anda',
+      loginSubtitle: 'Akses ruang spiritual pribadi Anda',
+      signupSubtitle: 'Bergabunglah dengan komunitas belajar kami',
+      emailLabel: 'Alamat Email',
+      passwordLabel: 'Kata Sandi',
+      nameLabel: 'Nama Lengkap',
+      forgotPass: 'Lupa kata sandi Anda?',
+      loginBtn: 'Masuk',
+      signupBtn: 'Daftar',
+      createAcc: 'Buat akun baru',
+      haveAcc: 'Sudah punya akun? Masuk',
+      terms: 'Dengan melanjutkan, Anda menyetujui Syarat dan Kebijakan Privasi kami',
+      onboardingStep: 'Langkah',
+      finish: 'Selesai',
+      next: 'Berikutnya',
+      q1: 'Bagaimana Anda ingin saya memanggil Anda?',
+      q1Options: ['Saudara', 'Saudari'],
+      q2: 'Apa tingkat pengetahuan Anda tentang Islam?',
+      q2Options: ['Pemula', 'Menengah', 'Lanjutan'],
+      q3: 'Topik apa yang paling menarik bagi Anda?',
+      q3Options: ['Sejarah', 'Fiqh', 'Spiritualitas', 'Al-Quran', 'Hadits'],
+      q4: 'Apa tujuan utama Anda dengan Deenly?',
+      q4Options: ['Belajar', 'Menyelesaikan keraguan', 'Koneksi harian'],
+      confirmEmail: 'Akun Anda telah berhasil dibuat! Untuk memulai pengalaman Deenly Anda, silakan verifikasi email Anda melalui tautan yang telah kami kirimkan.',
+      confirmEmailTitle: 'Hampir sampai!',
+      confirmEmailBtn: 'Pergi ke Login',
+      errorSupabase: 'Supabase tidak dikonfigurasi. Silakan tambahkan variabel lingkungan.',
+      errorTimeout: 'Koneksi memakan waktu lebih lama dari yang diharapkan. Silakan periksa internet Anda dan coba lagi.',
+      errorRateLimit: 'Anda telah mencoba mendaftar terlalu sering. Harap tunggu beberapa menit.',
+      errorUnexpected: 'Terjadi kesalahan tak terduga saat menghubungkan ke Supabase',
+      errorOnboarding: 'Ada masalah kecil saat menyimpan ke cloud, tapi jangan khawatir. Klik Selesai lagi untuk masuk.',
+      skipOnboarding: 'Lewati dan masuk saja'
+    },
+    'Deutsch': {
+      loginTitle: 'Willkommen bei Deenly',
+      signupTitle: 'Erstellen Sie Ihr Konto',
+      loginSubtitle: 'Greifen Sie auf Ihren personalisierten spirituellen Raum zu',
+      signupSubtitle: 'Treten Sie unserer Lerngemeinschaft bei',
+      emailLabel: 'E-Mail-Adresse',
+      passwordLabel: 'Passwort',
+      nameLabel: 'Vollständiger Name',
+      forgotPass: 'Passwort vergessen?',
+      loginBtn: 'Anmelden',
+      signupBtn: 'Registrieren',
+      createAcc: 'Neues Konto erstellen',
+      haveAcc: 'Haben Sie bereits ein Konto? Anmelden',
+      terms: 'Durch Fortfahren stimmen Sie unseren Nutzungsbedingungen und Datenschutzbestimmungen zu',
+      onboardingStep: 'Schritt',
+      finish: 'Beenden',
+      next: 'Weiter',
+      q1: 'Wie soll ich Sie ansprechen?',
+      q1Options: ['Bruder', 'Schwester'],
+      q2: 'Wie hoch ist Ihr Wissensstand über den Islam?',
+      q2Options: ['Anfänger', 'Fortgeschritten', 'Experte'],
+      q3: 'Welche Themen interessieren Sie am meisten?',
+      q3Options: ['Geschichte', 'Fiqh', 'Spiritualität', 'Koran', 'Hadith'],
+      q4: 'Was ist Ihr Hauptziel mit Deenly?',
+      q4Options: ['Lernen', 'Zweifel klären', 'Tägliche Verbindung'],
+      confirmEmail: 'Ihr Konto wurde erfolgreich erstellt! Um Ihr Deenly-Erlebnis zu beginnen, bestätigen Sie bitte Ihre E-Mail über den Link, den wir Ihnen gesendet haben.',
+      confirmEmailTitle: 'Fast geschafft!',
+      confirmEmailBtn: 'Zum Login gehen',
+      errorSupabase: 'Supabase ist nicht konfiguriert. Bitte fügen Sie die Umgebungsvariablen hinzu.',
+      errorTimeout: 'Die Verbindung dauert länger als erwartet. Bitte überprüfen Sie Ihr Internet und versuchen Sie es erneut.',
+      errorRateLimit: 'Sie haben zu oft versucht, sich zu registrieren. Bitte warten Sie einige Minuten.',
+      errorUnexpected: 'Ein unerwarteter Fehler ist beim Verbinden mit Supabase aufgetreten',
+      errorOnboarding: 'Es gab ein kleines Problem beim Speichern in der Cloud, aber keine Sorge. Klicken Sie erneut auf Beenden, um einzutreten.',
+      skipOnboarding: 'Überspringen und trotzdem eintreten'
+    }
+  };
+
+  const t = translations[language] || translations['Español'];
+
   const onboardingQuestions = [
     {
       id: 'gender',
-      question: '¿Cómo prefieres que me dirija a ti?',
-      options: ['Hermano', 'Hermana']
+      question: t.q1,
+      options: t.q1Options
     },
     {
       id: 'knowledgeLevel',
-      question: '¿Cuál es tu nivel de conocimiento sobre el Islam?',
-      options: ['Principiante', 'Intermedio', 'Avanzado']
+      question: t.q2,
+      options: t.q2Options
     },
     {
       id: 'interests',
-      question: '¿Qué temas te interesan más?',
-      options: ['Historia', 'Fiqh', 'Espiritualidad', 'Corán', 'Hadiz'],
+      question: t.q3,
+      options: t.q3Options,
       multiple: true
     },
     {
       id: 'goal',
-      question: '¿Cuál es tu objetivo principal con Deenly?',
-      options: ['Aprender', 'Resolver dudas', 'Conexión diaria']
+      question: t.q4,
+      options: t.q4Options
     }
   ];
 
@@ -53,7 +269,7 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
     e.preventDefault();
     
     if (!isSupabaseConfigured) {
-      setError('Supabase no está configurado. Por favor, añade las variables de entorno VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.');
+      setError(t.errorSupabase);
       return;
     }
 
@@ -63,19 +279,22 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
     console.log('Iniciando proceso de autenticación...', { isLogin, email });
 
     try {
-      // Timeout de 15 segundos para evitar que se quede cargando infinitamente
+      // Timeout de 30 segundos para evitar que se quede cargando infinitamente
       const authPromise = isLogin 
         ? supabase.auth.signInWithPassword({ email, password })
         : supabase.auth.signUp({
             email,
             password,
             options: {
-              data: { full_name: fullName },
+              data: { 
+                full_name: fullName,
+                settings: { language } // Save initial language preference
+              },
             },
           });
 
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('La conexión con el servidor ha tardado demasiado. Por favor, verifica tu conexión a internet y las credenciales de Supabase.')), 15000)
+        setTimeout(() => reject(new Error(t.errorTimeout)), 30000)
       );
 
       const { data, error }: any = await Promise.race([authPromise, timeoutPromise]);
@@ -93,12 +312,16 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
           setShowOnboarding(true);
         } else {
           console.log('Registro exitoso, esperando confirmación de email.');
-          setSuccess('¡Registro exitoso! Por favor, revisa tu correo para confirmar tu cuenta.');
+          setSuccess(t.confirmEmail);
         }
       }
     } catch (err: any) {
       console.error('Error en handleAuth:', err);
-      setError(err.message || 'Ocurrió un error inesperado al conectar con Supabase');
+      if (err.message.includes('rate limit')) {
+        setError(t.errorRateLimit);
+      } else {
+        setError(err.message || t.errorUnexpected);
+      }
     } finally {
       setLoading(false);
       console.log('Proceso de autenticación finalizado.');
@@ -114,34 +337,50 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
       try {
         console.log('Finalizando onboarding...', onboardingData);
         
-        // Intentar actualizar el usuario en Supabase
-        const { data: sessionData } = await supabase.auth.getSession();
-        
-        if (!sessionData.session) {
-          // Si no hay sesión, es probable que necesite confirmar email
-          throw new Error('Para finalizar, por favor confirma tu correo electrónico primero. Revisa tu bandeja de entrada (y SPAM).');
-        }
+        // Timeout de 30 segundos
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error(t.errorTimeout)), 30000)
+        );
 
-        const { error: updateError } = await supabase.auth.updateUser({
-          data: { 
-            onboarding: onboardingData,
-            is_onboarded: true
+        const onboardingPromise = (async () => {
+          // Intentar actualizar el usuario en Supabase
+          const { data: sessionData } = await supabase.auth.getSession();
+          
+          if (!sessionData.session) {
+            // Si no hay sesión, es probable que necesite confirmar email
+            throw new Error(t.confirmEmail);
           }
-        });
 
-        if (updateError) throw updateError;
+          const { error: updateError } = await supabase.auth.updateUser({
+            data: { 
+              onboarding: onboardingData,
+              is_onboarded: true,
+              settings: { language }
+            }
+          });
+
+          if (updateError) throw updateError;
+          return true;
+        })();
+
+        await Promise.race([onboardingPromise, timeoutPromise]);
 
         setSuccess('¡Perfil completado! Redirigiendo...');
         setTimeout(() => window.location.reload(), 1500);
       } catch (err: any) {
         console.error('Error al finalizar onboarding:', err);
         
-        // Fallback: Si es un error de sesión/permisos, guardamos localmente y permitimos continuar
-        if (err.message.includes('confirm') || err.status === 401) {
-          setError(err.message);
+        // Si es un error de sesión/permisos (probablemente falta confirmar email)
+        if (err.message === t.confirmEmail || err.status === 401) {
+          // Guardamos en localStorage para intentar sincronizar después del login real
+          localStorage.setItem('deenly_onboarding_pending', JSON.stringify(onboardingData));
+          
+          // En lugar de error, mostramos el éxito del registro (que incluye el aviso de confirmación)
+          setSuccess(t.confirmEmail);
+          setShowOnboarding(false);
         } else {
-          // Error genérico, intentamos forzar la entrada
-          setError('Hubo un pequeño problema al guardar en la nube, pero no te preocupes. Haz clic en Finalizar de nuevo para entrar.');
+          // Error genérico, intentamos forzar la entrada o informar del fallo
+          setError(t.errorOnboarding);
           // Guardamos en localStorage como respaldo
           localStorage.setItem('deenly_onboarding_fallback', JSON.stringify(onboardingData));
           setTimeout(() => window.location.reload(), 3000);
@@ -176,7 +415,7 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
               ))}
             </div>
             <h2 className="text-2xl font-bold mb-2">{currentQ.question}</h2>
-            <p className="text-sm opacity-50">Paso {onboardingStep + 1} de {onboardingQuestions.length}</p>
+            <p className="text-sm opacity-50">{t.onboardingStep} {onboardingStep + 1} de {onboardingQuestions.length}</p>
           </div>
 
           <div className="space-y-3">
@@ -226,7 +465,7 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
                   onClick={() => window.location.reload()}
                   className="text-xs font-bold underline hover:text-white text-left"
                 >
-                  ¿Ya lo has confirmado? Haz clic aquí para entrar.
+                  {t.confirmEmailBtn}
                 </button>
               )}
             </motion.div>
@@ -237,7 +476,7 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
             disabled={loading || (!currentQ.multiple && !(onboardingData as any)[currentQ.id]) || (currentQ.multiple && onboardingData.interests.length === 0)}
             className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2 mt-8 shadow-lg shadow-emerald-500/20 disabled:opacity-50 active:scale-[0.98]"
           >
-            {loading ? <Loader2 className="animate-spin" size={20} /> : (onboardingStep === onboardingQuestions.length - 1 ? 'Finalizar' : 'Siguiente')}
+            {loading ? <Loader2 className="animate-spin" size={20} /> : (onboardingStep === onboardingQuestions.length - 1 ? t.finish : t.next)}
             <ArrowRight size={18} />
           </button>
           
@@ -246,7 +485,7 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
               onClick={() => window.location.reload()}
               className="w-full mt-4 py-2 text-xs text-white/40 hover:text-white transition-colors"
             >
-              Saltar y entrar de todos modos
+              {t.skipOnboarding}
             </button>
           )}
         </motion.div>
@@ -259,6 +498,22 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
       {/* Dynamic Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#0a2e24] via-[#1a4d3e] to-[#0a2e24]" />
       
+      {/* Language Selector */}
+      <div className="absolute top-6 right-6 z-20">
+        <button
+          onClick={() => {
+            const languages = ['Español', 'English', 'Français', 'العربية', 'Indonesian', 'Deutsch'];
+            const currentIndex = languages.indexOf(language);
+            const next = languages[(currentIndex + 1) % languages.length];
+            setLanguage(next);
+          }}
+          className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold transition-all backdrop-blur-md"
+        >
+          <Globe size={14} className="text-deenly-gold" />
+          {language}
+        </button>
+      </div>
+
       {/* Stars/Particles Effect */}
       <div className="absolute inset-0 pointer-events-none opacity-30">
         {[...Array(20)].map((_, i) => (
@@ -291,7 +546,7 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
           </svg>
         </div>
         <h1 className="text-5xl font-bold tracking-[0.2em] text-white mb-2 drop-shadow-lg">DEENLY</h1>
-        <p className="text-emerald-100/70 text-sm tracking-widest uppercase font-medium">Tu compañero espiritual en el camino del conocimiento</p>
+        <p className="text-emerald-100/70 text-sm tracking-widest uppercase font-medium">{language === 'Español' ? 'Tu compañero espiritual en el camino del conocimiento' : (language === 'English' ? 'Your spiritual companion on the path of knowledge' : (language === 'Français' ? 'Votre compagnon spirituel sur le chemin de la connaissance' : (language === 'العربية' ? 'رفيقك الروحي في طريق المعرفة' : (language === 'Indonesian' ? 'Teman spiritual Anda di jalan pengetahuan' : 'Ihr spiritueller Begleiter auf dem Weg des Wissens'))))}</p>
       </motion.div>
 
       {/* Glassmorphism Card */}
@@ -305,10 +560,10 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
         
         <div className="text-center mb-10">
           <h2 className="text-3xl font-bold text-white mb-2">
-            {isLogin ? 'Bienvenido a Deenly' : 'Crea tu cuenta'}
+            {success ? (t.confirmEmailTitle || t.signupTitle) : (isLogin ? t.loginTitle : t.signupTitle)}
           </h2>
           <p className="text-white/60 text-sm">
-            {isLogin ? 'Accede a tu espacio espiritual personalizado' : 'Únete a nuestra comunidad de aprendizaje'}
+            {success ? '' : (isLogin ? t.loginSubtitle : t.signupSubtitle)}
           </p>
           <div className="flex justify-center mt-4">
             <div className="h-px w-12 bg-white/20" />
@@ -317,137 +572,178 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
           </div>
         </div>
 
-        <form onSubmit={handleAuth} className="space-y-6">
-          <AnimatePresence mode="wait">
-            {!isLogin && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="space-y-2"
-              >
-                <label className="text-xs font-bold uppercase tracking-widest text-white/70 ml-1">Nombre completo</label>
+        <AnimatePresence mode="wait">
+          {success ? (
+            <motion.div 
+              key="success-view"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="text-center py-4 space-y-8"
+            >
+              <div className="flex justify-center">
+                <div className="w-24 h-24 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 shadow-[0_0_50px_rgba(16,185,129,0.1)] relative">
+                  <div className="absolute inset-0 bg-emerald-500/20 blur-2xl rounded-full animate-pulse" />
+                  <Mail className="text-emerald-400 relative z-10" size={48} />
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <p className="text-white/80 text-base leading-relaxed px-2">
+                  {success}
+                </p>
+                <p className="text-white/40 text-xs italic">
+                  {language === 'Español' ? 'No olvides revisar tu carpeta de spam.' : 'Don\'t forget to check your spam folder.'}
+                </p>
+              </div>
+
+              <div className="pt-4">
+                <button
+                  onClick={() => {
+                    setSuccess(null);
+                    setIsLogin(true);
+                  }}
+                  className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-bold transition-all shadow-xl shadow-emerald-900/40 active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                  {t.confirmEmailBtn}
+                  <ArrowRight size={18} />
+                </button>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.form 
+              key="auth-form"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onSubmit={handleAuth} 
+              className="space-y-6"
+            >
+              <AnimatePresence mode="wait">
+                {!isLogin && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-2"
+                  >
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/70 ml-1">{t.nameLabel}</label>
+                    <div className="relative group">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-emerald-400 transition-colors" size={18} />
+                      <input
+                        type="text"
+                        required={!isLogin}
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 focus:bg-white/10 focus:border-emerald-400/50 focus:ring-4 focus:ring-emerald-400/10 outline-none transition-all"
+                        placeholder={t.nameLabel}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-white/70 ml-1">{t.emailLabel}</label>
                 <div className="relative group">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-emerald-400 transition-colors" size={18} />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-emerald-400 transition-colors" size={18} />
                   <input
-                    type="text"
-                    required={!isLogin}
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 focus:bg-white/10 focus:border-emerald-400/50 focus:ring-4 focus:ring-emerald-400/10 outline-none transition-all"
-                    placeholder="Tu nombre"
+                    placeholder={t.emailLabel}
                   />
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-white/70 ml-1">Correo electrónico</label>
-            <div className="relative group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-emerald-400 transition-colors" size={18} />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 focus:bg-white/10 focus:border-emerald-400/50 focus:ring-4 focus:ring-emerald-400/10 outline-none transition-all"
-                placeholder="Tu correo electrónico"
-              />
-            </div>
-          </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-white/70 ml-1">{t.passwordLabel}</label>
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-emerald-400 transition-colors" size={18} />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-12 pr-12 py-4 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 focus:bg-white/10 focus:border-emerald-400/50 focus:ring-4 focus:ring-emerald-400/10 outline-none transition-all"
+                    placeholder={t.passwordLabel}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-white/70 ml-1">Contraseña</label>
-            <div className="relative group">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-emerald-400 transition-colors" size={18} />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-12 pr-12 py-4 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-white/20 focus:bg-white/10 focus:border-emerald-400/50 focus:ring-4 focus:ring-emerald-400/10 outline-none transition-all"
-                placeholder="Tu contraseña"
-              />
+              {isLogin && (
+                <div className="text-right">
+                  <button type="button" className="text-xs text-white/40 hover:text-white transition-colors">
+                    {t.forgotPass}
+                  </button>
+                </div>
+              )}
+
+              {error && (
+                <motion.div 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="flex items-center gap-2 p-4 rounded-2xl bg-red-500/20 border border-red-500/30 text-red-200 text-sm"
+                >
+                  <AlertCircle size={16} />
+                  <span>{error}</span>
+                </motion.div>
+              )}
+
               <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                type="submit"
+                disabled={loading}
+                className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-xl shadow-emerald-900/40 active:scale-[0.98]"
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                {loading ? (
+                  <Loader2 className="animate-spin" size={20} />
+                ) : (
+                  <>
+                    {isLogin ? t.loginBtn : t.signupBtn}
+                    <ArrowRight size={18} />
+                  </>
+                )}
+              </button>
+            </motion.form>
+          )}
+        </AnimatePresence>
+
+        {!success && (
+          <>
+            <div className="relative my-8">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-white/10"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-[#1a4d3e] px-2 text-white/30">{language === 'العربية' ? 'أو' : (language === 'Indonesian' ? 'atau' : (language === 'Deutsch' ? 'oder' : (language === 'Français' ? 'ou' : 'o')))}</span>
+              </div>
+            </div>
+
+            <div className="text-center">
+              <button
+                onClick={() => setIsLogin(!isLogin)}
+                className="w-full py-4 rounded-2xl border border-white/10 text-white/80 font-medium hover:bg-white/5 transition-all active:scale-[0.98]"
+              >
+                {isLogin ? t.createAcc : t.haveAcc}
               </button>
             </div>
-          </div>
 
-          {isLogin && (
-            <div className="text-right">
-              <button type="button" className="text-xs text-white/40 hover:text-white transition-colors">
-                ¿Olvidaste tu contraseña?
-              </button>
+            <div className="mt-8 text-center">
+              <p className="text-[10px] text-white/30 leading-relaxed">
+                {t.terms}
+              </p>
             </div>
-          )}
-
-          {error && (
-            <motion.div 
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="flex items-center gap-2 p-4 rounded-2xl bg-red-500/20 border border-red-500/30 text-red-200 text-sm"
-            >
-              <AlertCircle size={16} />
-              <span>{error}</span>
-            </motion.div>
-          )}
-
-          {success && (
-            <motion.div 
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="flex items-center gap-2 p-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-200 text-sm"
-            >
-              <CheckCircle2 size={16} />
-              <span>{success}</span>
-            </motion.div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-xl shadow-emerald-900/40 active:scale-[0.98]"
-          >
-            {loading ? (
-              <Loader2 className="animate-spin" size={20} />
-            ) : (
-              <>
-                {isLogin ? 'Iniciar sesión' : 'Registrarse'}
-                <ArrowRight size={18} />
-              </>
-            )}
-          </button>
-        </form>
-
-        <div className="relative my-8">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-white/10"></div>
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-[#1a4d3e] px-2 text-white/30">o</span>
-          </div>
-        </div>
-
-        <div className="text-center">
-          <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="w-full py-4 rounded-2xl border border-white/10 text-white/80 font-medium hover:bg-white/5 transition-all active:scale-[0.98]"
-          >
-            {isLogin ? 'Crear cuenta nueva' : '¿Ya tienes cuenta? Inicia sesión'}
-          </button>
-        </div>
-
-        <div className="mt-8 text-center">
-          <p className="text-[10px] text-white/30 leading-relaxed">
-            Al continuar, aceptas nuestros <button className="underline hover:text-white">Términos</button> y <button className="underline hover:text-white">Política de Privacidad</button>
-          </p>
-        </div>
+          </>
+        )}
       </motion.div>
 
       {/* Footer Quote */}
@@ -461,7 +757,7 @@ export const Auth: React.FC<AuthProps> = ({ darkMode }) => {
           وَإِذَا سَأَلَكَ عِبَادِي عَنِّي فَإِنِّي قَرِيبٌ
         </p>
         <p className="text-white/40 text-xs italic">
-          "Y cuando mis siervos te pregunten por Mí, diles que estoy cerca..." (Corán 2:186)
+          {language === 'Español' ? '"Y cuando mis siervos te pregunten por Mí, diles que estoy cerca..." (Corán 2:186)' : (language === 'English' ? '"And when My servants ask you concerning Me, then surely I am near..." (Quran 2:186)' : (language === 'Français' ? '"Et quand Mes serviteurs t\'interrogent sur Moi, alors Je suis proche..." (Coran 2:186)' : (language === 'العربية' ? '"وإذا سألك عبادي عني فإني قريب..." (القرآن 2:186)' : (language === 'Indonesian' ? '"Dan apabila hamba-hamba-Ku bertanya kepadamu tentang Aku, maka sesungguhnya Aku dekat..." (Al-Quran 2:186)' : '"Und wenn Meine Diener dich nach Mir fragen, siehe, Ich bin nahe..." (Koran 2:186)'))))}
         </p>
       </motion.div>
     </div>
