@@ -8,9 +8,10 @@ interface PrayerTimesModalProps {
   darkMode: boolean;
   language: string;
   t: any;
+  showToast?: (message: string, type?: 'error' | 'success') => void;
 }
 
-export const PrayerTimesModal: React.FC<PrayerTimesModalProps> = ({ isOpen, onClose, darkMode, language, t }) => {
+export const PrayerTimesModal: React.FC<PrayerTimesModalProps> = ({ isOpen, onClose, darkMode, language, t, showToast }) => {
   const [location, setLocation] = useState({ city: 'Madrid', lat: 40.4168, lng: -3.7038 });
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
   const [nextPrayer, setNextPrayer] = useState<{ name: string; time: Date; countdown: string } | null>(null);
@@ -74,17 +75,20 @@ export const PrayerTimesModal: React.FC<PrayerTimesModalProps> = ({ isOpen, onCl
           const city = data.address.city || data.address.town || data.address.village || data.address.state || 'Ubicación detectada';
           setLocation({ city, lat: latitude, lng: longitude });
           setIsEditingLocation(false);
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error geocoding:', error);
+          if (showToast) showToast(language === 'Español' ? "Error al obtener dirección" : "Error getting address", 'error');
           setLocation({ ...location, lat: latitude, lng: longitude });
         } finally {
           setIsUpdating(false);
         }
       }, (error) => {
         console.error('Geolocation error:', error);
+        if (showToast) showToast(language === 'Español' ? "Error de geolocalización" : "Geolocation error", 'error');
         setIsUpdating(false);
       });
     } else {
+      if (showToast) showToast(language === 'Español' ? "Geolocalización no soportada" : "Geolocation not supported", 'error');
       setIsUpdating(false);
     }
   };
@@ -103,6 +107,7 @@ export const PrayerTimesModal: React.FC<PrayerTimesModalProps> = ({ isOpen, onCl
       }
     } catch (error) {
       console.error('Error geocoding city:', error);
+      if (showToast) showToast(language === 'Español' ? "Ciudad no encontrada" : "City not found", 'error');
     } finally {
       setIsUpdating(false);
     }

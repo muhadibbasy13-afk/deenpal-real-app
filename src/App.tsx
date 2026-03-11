@@ -43,6 +43,7 @@ import { getMuftiResponse, type ChatMessage as GeminiChatMessage } from './servi
 import { chatService, type Chat, type Message as DbMessage } from './services/chatService';
 import ReactMarkdown from 'react-markdown';
 import type { Session } from '@supabase/supabase-js';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Message {
   id: string;
@@ -98,6 +99,7 @@ export default function App() {
   const [isIslamicCalendarOpen, setIsIslamicCalendarOpen] = useState(false);
   const [isHadithModalOpen, setIsHadithModalOpen] = useState(false);
   const [isPrayerTimesModalOpen, setIsPrayerTimesModalOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
@@ -967,38 +969,48 @@ export default function App() {
 
   const deleteChat = async (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
-    if (!confirm(t.confirmClear)) return;
-    try {
-      await chatService.deleteChat(sessionId);
-      const newSessions = sessions.filter(s => s.id !== sessionId);
-      setSessions(newSessions);
-      if (currentSessionId === sessionId) {
-        if (newSessions.length > 0) {
-          switchChat(newSessions[0].id);
-        } else {
-          await createInitialChat();
+    setConfirmAction({
+      message: t.confirmClear,
+      onConfirm: async () => {
+        try {
+          await chatService.deleteChat(sessionId);
+          const newSessions = sessions.filter(s => s.id !== sessionId);
+          setSessions(newSessions);
+          if (currentSessionId === sessionId) {
+            if (newSessions.length > 0) {
+              switchChat(newSessions[0].id);
+            } else {
+              await createInitialChat();
+            }
+          }
+          showToast('Conversación eliminada correctamente', 'success');
+        } catch (error: any) {
+          console.error('Error deleting chat:', error);
+          showToast(error.message || 'Error al eliminar la conversación');
         }
+        setConfirmAction(null);
       }
-      showToast('Conversación eliminada correctamente', 'success');
-    } catch (error: any) {
-      console.error('Error deleting chat:', error);
-      showToast(error.message || 'Error al eliminar la conversación');
-    }
+    });
   };
 
   const clearAllChats = async () => {
-    if (!confirm(t.confirmClear)) return;
-    try {
-      await chatService.clearAllChats();
-      setSessions([]);
-      setMessages([]);
-      setCurrentSessionId(null);
-      await createInitialChat();
-      showToast('Historial limpiado correctamente', 'success');
-    } catch (error: any) {
-      console.error('Error clearing all chats:', error);
-      showToast(error.message || 'Error al limpiar el historial');
-    }
+    setConfirmAction({
+      message: t.confirmClear,
+      onConfirm: async () => {
+        try {
+          await chatService.clearAllChats();
+          setSessions([]);
+          setMessages([]);
+          setCurrentSessionId(null);
+          await createInitialChat();
+          showToast('Historial limpiado correctamente', 'success');
+        } catch (error: any) {
+          console.error('Error clearing all chats:', error);
+          showToast(error.message || 'Error al limpiar el historial');
+        }
+        setConfirmAction(null);
+      }
+    });
   };
 
   const deleteMessage = async (messageId: string) => {
@@ -1146,7 +1158,7 @@ export default function App() {
       if (url) window.location.href = url;
     } catch (error: any) {
       console.error('Error creating checkout session:', error);
-      alert('Error al iniciar el proceso de pago. Por favor, inténtalo de nuevo.');
+      showToast(language === 'Español' ? 'Error al iniciar el proceso de pago. Por favor, inténtalo de nuevo.' : 'Error starting payment process. Please try again.', 'error');
     }
   };
 
@@ -1552,6 +1564,7 @@ export default function App() {
         darkMode={darkMode}
         session={session}
         language={language}
+        showToast={showToast}
       />
 
       {/* Profile Modal */}
@@ -1573,6 +1586,7 @@ export default function App() {
         setDarkMode={setDarkMode}
         isPremium={isPremium}
         session={session}
+        showToast={showToast}
       />
 
       {/* About Modal */}
@@ -1595,6 +1609,7 @@ export default function App() {
         darkMode={darkMode}
         language={language}
         t={t}
+        showToast={showToast}
       />
 
       <AboutModal
@@ -1604,18 +1619,67 @@ export default function App() {
         t={t}
       />
 
+      {/* Confirmation Dialog */}
+      <AnimatePresence>
+        {confirmAction && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setConfirmAction(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className={`relative w-full max-w-sm p-8 rounded-[32px] shadow-2xl ${
+                darkMode ? 'bg-deenly-dark-surface border border-deenly-gold/20' : 'bg-white border border-deenly-gold/10'
+              }`}
+            >
+              <h3 className="text-lg font-bold mb-4 text-center">{confirmAction.message}</h3>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmAction(null)}
+                  className={`flex-1 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest border transition-colors ${
+                    darkMode ? 'border-deenly-gold/20 hover:bg-white/5' : 'border-deenly-gold/10 hover:bg-black/5'
+                  }`}
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  onClick={confirmAction.onConfirm}
+                  className="flex-1 py-3 bg-red-500 text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
+                >
+                  {t.confirm}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Toast Notifications */}
-      {toast && (
-        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300 ${
-          toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-deenly-gold text-deenly-ink'
-        }`}>
-          {toast.type === 'error' ? <Info size={18} /> : <Check size={18} />}
-          <p className="text-sm font-medium">{toast.message}</p>
-          <button onClick={() => setToast(null)} className="p-1 hover:bg-black/10 rounded-full transition-colors">
-            <X size={14} />
-          </button>
-        </div>
-      )}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 min-w-[280px] ${
+              toast.type === 'error' 
+                ? 'bg-red-500 text-white' 
+                : 'bg-deenly-gold text-white'
+            }`}
+          >
+            <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+              {toast.type === 'error' ? <X size={14} /> : <Check size={14} />}
+            </div>
+            <p className="text-xs font-bold uppercase tracking-widest">{toast.message}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Plans Modal */}
       <PlansModal

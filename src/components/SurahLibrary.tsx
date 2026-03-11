@@ -222,7 +222,18 @@ export const SurahLibrary: React.FC<SurahLibraryProps> = ({ isOpen, onClose, dar
       const data = await response.json();
       
       if (data.code === 200 && data.data.ayahs && sessionId === currentSessionIdRef.current) {
-        const ayahsData = data.data.ayahs;
+        let ayahsData = [...data.data.ayahs];
+        
+        // Add Bismillah if not Surah 1 or 9
+        if (surahNumber !== 1 && surahNumber !== 9) {
+          ayahsData.unshift({
+            number: 1,
+            audio: `https://cdn.islamic.network/quran/audio/128/${quranReciter}/1.mp3`,
+            numberInSurah: 0,
+            text: "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"
+          });
+        }
+
         let index = 0;
         let retryCount = 0;
         const MAX_RETRIES = 3;
@@ -270,11 +281,11 @@ export const SurahLibrary: React.FC<SurahLibraryProps> = ({ isOpen, onClose, dar
             return;
           }
 
-          setPlayingAyah(`${surahNumber}:${ayah.numberInSurah}`);
+          setPlayingAyah(ayah.numberInSurah === 0 ? `bismillah-${surahNumber}` : `${surahNumber}:${ayah.numberInSurah}`);
           
           if ('mediaSession' in navigator) {
             navigator.mediaSession.metadata = new MediaMetadata({
-              title: `${selectedSurah?.name} - Aya ${ayah.numberInSurah}`,
+              title: ayah.numberInSurah === 0 ? 'Bismillah' : `${selectedSurah?.name} - Aya ${ayah.numberInSurah}`,
               artist: 'Deenly Quran Player',
               album: selectedSurah?.englishNameTranslation || 'Corán',
               artwork: [
@@ -386,7 +397,9 @@ export const SurahLibrary: React.FC<SurahLibraryProps> = ({ isOpen, onClose, dar
       if (sessionId === currentSessionIdRef.current) {
         console.error("Error playing full surah audio:", err);
         stopPlayback();
-        alert("No se pudo cargar el audio de la Sura completa. Por favor, intenta reproducir las Ayas individualmente.");
+        if (showToast) {
+          showToast(language === 'Español' ? "No se pudo cargar el audio de la Sura completa." : "Could not load full Surah audio.", 'error');
+        }
       }
     }
   };

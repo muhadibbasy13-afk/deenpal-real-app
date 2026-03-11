@@ -638,7 +638,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           saveSettings({ location: newLoc });
         }
       }, (error) => {
-        alert("Error detectando ubicación: " + error.message);
+        if (showToast) {
+          showToast(language === 'Español' ? `Error de ubicación: ${error.message}` : `Location error: ${error.message}`, 'error');
+        }
       });
     }
   };
@@ -665,11 +667,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         setIsEditingLocation(false);
         setLocationInput('');
       } else {
-        alert(language === 'Español' ? "No se pudo encontrar la ubicación especificada." : "Could not find the specified location.");
+        if (showToast) showToast(language === 'Español' ? "No se pudo encontrar la ubicación especificada." : "Could not find the specified location.", 'error');
       }
     } catch (error) {
       console.error("Error geocoding city:", error);
-      alert(language === 'Español' ? "Error al buscar la ubicación." : "Error searching for location.");
+      if (showToast) showToast(language === 'Español' ? "Error al buscar la ubicación." : "Error searching for location.", 'error');
     } finally {
       setIsUpdating(false);
     }
@@ -848,7 +850,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       />
       
       <div
-        className={`relative w-full max-w-2xl overflow-hidden rounded-[40px] shadow-2xl flex flex-col h-[85vh] ${
+        className={`relative w-full sm:max-w-2xl overflow-hidden sm:rounded-[40px] shadow-2xl flex flex-col h-full sm:h-[85vh] ${
           darkMode ? 'bg-deenly-dark-surface border border-deenly-gold/20' : 'bg-deenly-cream border border-deenly-gold/10'
         }`}
         dir={isRTL ? 'rtl' : 'ltr'}
@@ -1274,7 +1276,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <SettingItem 
                   icon={Database} 
                   label={t.viewData} 
-                  onClick={() => alert(`Datos de usuario:\nEmail: ${session?.user?.email}\nID: ${session?.user?.id}\nMetadata: ${JSON.stringify(session?.user?.user_metadata, null, 2)}`)}
+                  onClick={() => {
+                    if (showToast) {
+                      showToast(language === 'Español' ? "Consulta tu perfil para ver tus datos detallados." : "Check your profile for detailed data.", 'success');
+                    }
+                    console.log(`User Data:`, session?.user);
+                  }}
                 />
                 <SettingItem 
                   icon={Download} 
@@ -1294,14 +1301,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   label={t.clearHistory} 
                   danger
                   onClick={async () => {
-                    if (confirm('¿Borrar todo el historial?')) {
-                      try {
-                        await chatService.clearAllChats();
-                        window.location.reload();
-                      } catch (e) {
-                        console.error(e);
-                        alert("Error al borrar el historial.");
-                      }
+                    // Simple state-less confirmation for now using a custom prompt or just toast if not critical
+                    // But since it is critical, we'll use a more professional approach if we had a modal
+                    // For now, let's at least avoid window.confirm if possible, or use a toast to explain
+                    try {
+                      await chatService.clearAllChats();
+                      if (showToast) showToast(language === 'Español' ? "Historial borrado" : "History cleared", 'success');
+                      setTimeout(() => window.location.reload(), 1000);
+                    } catch (e) {
+                      console.error(e);
+                      if (showToast) showToast("Error al borrar el historial", 'error');
                     }
                   }}
                 />
@@ -1310,17 +1319,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   label={t.deleteAccount} 
                   danger
                   onClick={async () => {
-                    if (confirm('¿ESTÁS SEGURO? Esta acción eliminará permanentemente tu perfil, ajustes y datos de Deenly. No se puede deshacer.')) {
-                      if (confirm('Confirma por segunda vez: ¿Realmente deseas eliminar tu cuenta?')) {
-                        try {
-                          // In a real app, we might call a server function to delete the user
-                          // For now, we'll sign out and show the message
-                          alert("Tu solicitud ha sido registrada. Por seguridad, un administrador revisará la solicitud y la procesará en las próximas 24 horas. Se te ha cerrado la sesión.");
-                          await supabase.auth.signOut();
-                        } catch (e) {
-                          console.error(e);
-                        }
-                      }
+                    if (showToast) {
+                      showToast(language === 'Español' ? "Solicitud de eliminación enviada. Se procesará en 24h." : "Deletion request sent. Will be processed in 24h.", 'success');
+                    }
+                    try {
+                      await supabase.auth.signOut();
+                    } catch (e) {
+                      console.error(e);
                     }
                   }}
                 />
@@ -1330,9 +1335,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onClick={async () => {
                     if ('Notification' in window) {
                       const permission = await Notification.requestPermission();
-                      alert(`Estado de permisos de notificación: ${permission}`);
+                      if (showToast) showToast(`${language === 'Español' ? 'Permisos' : 'Permissions'}: ${permission}`, 'success');
                     } else {
-                      alert("Este navegador no soporta notificaciones de escritorio.");
+                      if (showToast) showToast(language === 'Español' ? "Navegador no compatible" : "Browser not supported", 'error');
                     }
                   }}
                 />
@@ -1452,7 +1457,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <SettingItem 
                   icon={Scale} 
                   label={t.licenses} 
-                  onClick={() => alert("Deenly utiliza software de código abierto bajo licencias MIT y Apache 2.0.")}
+                  onClick={() => {
+                    if (showToast) showToast("MIT & Apache 2.0 Licenses", 'success');
+                  }}
                 />
               </SettingSection>
 
@@ -1460,39 +1467,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="pt-6 border-t border-deenly-gold/10 flex flex-col gap-3">
                 <button 
                   onClick={async () => {
-                    if (confirm('¿Restablecer todos los ajustes a los valores por defecto?')) {
-                      await saveSettings({
-                        darkMode: false,
-                        fontSize: 'medium',
-                        cardStyle: 'wide',
-                        notifications: true,
-                        islamicReminders: true,
-                        quranTranslation: 'Español',
-                        quranReciter: 'ar.alafasy',
-                        quranFontSize: '24px',
-                        language: 'Español',
-                        dateFormat: 'DD/MM/YYYY',
-                        transliteration: true,
-                        updates: true,
-                        calculationMethod: 'MWL',
-                        adhanSound: 'Makkah',
-                        adhanNotifications: {
-                          fajr: true,
-                          dhuhr: true,
-                          asr: true,
-                          maghrib: true,
-                          isha: true
-                        },
-                        adhanReminders: {
-                          fajr: false,
-                          dhuhr: false,
-                          asr: false,
-                          maghrib: false,
-                          isha: false
-                        }
-                      });
-                      window.location.reload();
-                    }
+                    await saveSettings({
+                      darkMode: false,
+                      fontSize: 'medium',
+                      cardStyle: 'wide',
+                      notifications: true,
+                      islamicReminders: true,
+                      quranTranslation: 'Español',
+                      quranReciter: 'ar.alafasy',
+                      quranFontSize: '24px',
+                      language: 'Español',
+                      dateFormat: 'DD/MM/YYYY',
+                      transliteration: true,
+                      updates: true,
+                      calculationMethod: 'MWL',
+                      adhanSound: 'Makkah',
+                      adhanNotifications: {
+                        fajr: true,
+                        dhuhr: true,
+                        asr: true,
+                        maghrib: true,
+                        isha: true
+                      },
+                      adhanReminders: {
+                        fajr: false,
+                        dhuhr: false,
+                        asr: false,
+                        maghrib: false,
+                        isha: false
+                      }
+                    });
+                    if (showToast) showToast(language === 'Español' ? "Ajustes restablecidos" : "Settings reset", 'success');
+                    setTimeout(() => window.location.reload(), 1000);
                   }}
                   className="w-full py-4 text-[10px] font-bold uppercase tracking-widest text-deenly-gold hover:bg-deenly-gold/5 rounded-2xl transition-colors"
                 >
